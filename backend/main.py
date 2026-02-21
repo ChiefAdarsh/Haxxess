@@ -2,6 +2,7 @@ import os
 import tempfile
 from datetime import datetime
 from typing import Optional
+from dotenv import load_dotenv
 
 import librosa
 import whisper
@@ -22,6 +23,8 @@ from services.intelligence import (
     handle_virtual_assistant,
     generate_smart_alert
 )
+
+load_dotenv()
 
 
 class ChatRequest(BaseModel):
