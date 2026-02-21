@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Sidebar from './Sidebar'
+import DashboardHome from './clinician/DashboardHome'
 import PatientList from './clinician/PatientList'
 import PatientDetail from './clinician/PatientDetail'
 import CalendarView from './clinician/CalendarView'
@@ -37,16 +38,20 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
 
   const renderContent = () => {
     if (role === 'clinician') {
+      if (active === 'dashboard') return <DashboardHome onSelectPatient={handleSelectPatient} />
       if (active === 'patients' && selectedPatient) {
         return <PatientDetail patient={selectedPatient} onBack={() => setSelectedPatient(null)} />
       }
-      if (active === 'patients') {
-        return <PatientList onSelectPatient={setSelectedPatient} />
-      }
+      if (active === 'patients') return <PatientList onSelectPatient={setSelectedPatient} />
       if (active === 'calendar') return <CalendarView />
       if (active === 'billing') return <BillingView />
     }
     return <Placeholder label={current?.label || ''} />
+  }
+
+  const handleSelectPatient = (patient: Patient) => {
+    setSelectedPatient(patient)
+    setActive('patients')
   }
 
   // header title adjusts when viewing a patient
