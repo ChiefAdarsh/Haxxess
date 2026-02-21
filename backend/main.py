@@ -23,6 +23,15 @@ from services.intelligence import (
     handle_virtual_assistant,
     generate_smart_alert
 )
+from services.history import (
+    get_historical_vitality,
+    get_hourly_vitality,
+    get_signal_history,
+    get_composite_timeline,
+    get_event_timeline,
+    get_week_comparison,
+    compute_all_trends,
+)
 
 load_dotenv()
 
@@ -133,6 +142,7 @@ async def get_consolidated(
             wearable_snapshot=wearable_snapshot,
             # transcript_analysis=some_nlp_result,
             # behavioral_data=some_behavioral_result,
+            profile=wearable_prof,
         )
 
         _latest_consolidated = result
@@ -190,6 +200,7 @@ async def post_consolidated(
         result = consolidate(
             acoustic_result=_latest_acoustic,
             wearable_snapshot=wearable_snapshot,
+            profile=wearable_prof,
         )
 
         _latest_consolidated = result
@@ -335,6 +346,91 @@ async def get_smart_alert(profile: Optional[str] = Query(default=None)):
     except Exception as e:
         print(f"Error generating smart alert: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/history/vitality")
+async def history_vitality(
+    profile: Optional[str] = Query(default=None),
+    days: int = Query(default=30, ge=1, le=365),
+):
+    prof = profile or _wearable_profile
+    return {
+        "profile": prof,
+        "days": days,
+        "history": get_historical_vitality(prof, days),
+    }
+
+
+@app.get("/history/hourly")
+async def history_hourly(
+    profile: Optional[str] = Query(default=None),
+    hours: int = Query(default=48, ge=1, le=168),
+):
+    prof = profile or _wearable_profile
+    return {
+        "profile": prof,
+        "hours": hours,
+        "history": get_hourly_vitality(prof, hours),
+    }
+
+
+@app.get("/history/signal/{signal_name}")
+async def history_signal(
+    signal_name: str,
+    profile: Optional[str] = Query(default=None),
+    days: int = Query(default=30, ge=1, le=365),
+):
+    prof = profile or _wearable_profile
+    data = get_signal_history(prof, signal_name, days)
+    if data and "error" in data[0]:
+        raise HTTPException(status_code=400, detail=data[0]["error"])
+    return {
+        "profile": prof,
+        "signal": signal_name,
+        "days": days,
+        "history": data,
+    }
+
+
+@app.get("/history/timeline")
+async def history_timeline(
+    profile: Optional[str] = Query(default=None),
+    days: int = Query(default=30, ge=1, le=365),
+):
+    prof = profile or _wearable_profile
+    return get_composite_timeline(prof, days)
+
+
+@app.get("/history/events")
+async def history_events(
+    profile: Optional[str] = Query(default=None),
+):
+    prof = profile or _wearable_profile
+    return {
+        "profile": prof,
+        "events": get_event_timeline(prof),
+    }
+
+
+@app.get("/history/trends")
+async def history_trends(
+    profile: Optional[str] = Query(default=None),
+    days: int = Query(default=30, ge=1, le=365),
+):
+    prof = profile or _wearable_profile
+    return {
+        "profile": prof,
+        "days": days,
+        "trends": compute_all_trends(prof, days),
+    }
+
+
+@app.get("/history/week-comparison")
+async def history_week_comparison(
+    profile: Optional[str] = Query(default=None),
+):
+    prof = profile or _wearable_profile
+    return get_week_comparison(prof)
 
 
 @app.get("/")
