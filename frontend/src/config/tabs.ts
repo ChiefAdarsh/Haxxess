@@ -6,7 +6,8 @@ import {
   Bell,
   Apple,
   Users,
-  ClipboardList,
+  Calendar,
+  DollarSign,
 } from 'lucide-react'
 import type { Tab } from '../types'
 
@@ -22,9 +23,7 @@ export const patientTabs: Tab[] = [
 export const clinicianTabs: Tab[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'patients', label: 'Patients', icon: Users },
-  { id: 'vitals', label: 'Vitals Monitor', icon: Activity },
-  { id: 'risk', label: 'Risk Analysis', icon: HeartPulse },
-  { id: 'assistant', label: 'Diagnosis Aid', icon: MessageCircle },
+  { id: 'calendar', label: 'Calendar', icon: Calendar },
+  { id: 'billing', label: 'Billing', icon: DollarSign },
   { id: 'alerts', label: 'Alerts', icon: Bell },
-  { id: 'reports', label: 'Reports', icon: ClipboardList },
 ]
