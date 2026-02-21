@@ -11,6 +11,8 @@ from services.acoustics import analyze_audio
 import asyncio
 from fastapi import WebSocket, WebSocketDisconnect
 from services.wearable import MockOuraRing, MockAppleWatch
+from services.symptom_extract import extract_symptoms
+from pydantic import BaseModel
 
 print("     Loading AI models...")
 _whisper_model = whisper.load_model("base")
@@ -94,9 +96,44 @@ async def wearable_stream(websocket: WebSocket):
         print("     Frontend disconnected from wearable stream.")
 
 
+class TranscriptRequest(BaseModel):
+    transcript: str
+
+
+@app.post("/extract-symptoms")
+async def extract_symptoms_endpoint(req: TranscriptRequest):
+    result = extract_symptoms(req.transcript)
+    return {"status": "success", **result}
+
+
+@app.post("/call-triage")
+async def call_triage(file: UploadFile = File(...)):
+    tmp_path = None
+    try:
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+        content = await file.read()
+        tmp.write(content)
+        tmp.close()
+        tmp_path = tmp.name
+
+        transcript = transcribe(tmp_path)
+        extraction = extract_symptoms(transcript)
+
+        return {
+            "status": "success",
+            "transcript": transcript,
+            "extraction": extraction,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
 @app.get("/")
 def health_check():
-    return {"status": "ok", "message": "Acoustic Analysis API is running!"}
+    return {"status": "ok", "message": "Vitality API is running!"}
 
 
 if __name__ == "__main__":
