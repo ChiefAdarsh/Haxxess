@@ -3,13 +3,10 @@ import Sidebar from './Sidebar'
 import DashboardHome from './clinician/DashboardHome'
 import PatientList from './clinician/PatientList'
 import PatientDetail from './clinician/PatientDetail'
-import CalendarView from './clinician/CalendarView'
-import BillingView from './clinician/BillingView'
 import AlertsView from './clinician/AlertsView'
 import PatientHome from './patient/PatientHome'
-import MessagesView from './patient/MessagesView'
-import VitalsView from './patient/VitalsView'
-import WellnessView from './patient/WellnessView'
+import BodyMap from './patient/BodyMap'
+import SymptomHistory from './patient/SymptomHistory'
 import { patientTabs, clinicianTabs } from '../config/tabs'
 import type { Patient } from '../config/patients'
 
@@ -35,30 +32,9 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const current = tabs.find((t) => t.id === active)
 
-  // when switching tabs, clear selected patient
   const handleTabChange = (id: string) => {
     setActive(id)
     setSelectedPatient(null)
-  }
-
-  const renderContent = () => {
-    if (role === 'clinician') {
-      if (active === 'dashboard') return <DashboardHome onSelectPatient={handleSelectPatient} />
-      if (active === 'patients' && selectedPatient) {
-        return <PatientDetail patient={selectedPatient} onBack={() => setSelectedPatient(null)} />
-      }
-      if (active === 'patients') return <PatientList onSelectPatient={setSelectedPatient} />
-      if (active === 'calendar') return <CalendarView />
-      if (active === 'billing') return <BillingView />
-      if (active === 'alerts') return <AlertsView />
-    }
-    if (role === 'patient') {
-      if (active === 'home') return <PatientHome />
-      if (active === 'vitals') return <VitalsView />
-      if (active === 'messages') return <MessagesView />
-      if (active === 'wellness') return <WellnessView />
-    }
-    return <Placeholder label={current?.label || ''} />
   }
 
   const handleSelectPatient = (patient: Patient) => {
@@ -66,7 +42,23 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
     setActive('patients')
   }
 
-  // header title adjusts when viewing a patient
+  const renderContent = () => {
+    if (role === 'patient') {
+      if (active === 'home') return <PatientHome />
+      if (active === 'bodymap') return <BodyMap />
+      if (active === 'history') return <SymptomHistory />
+    }
+    if (role === 'clinician') {
+      if (active === 'dashboard') return <DashboardHome onSelectPatient={handleSelectPatient} />
+      if (active === 'patients' && selectedPatient) {
+        return <PatientDetail patient={selectedPatient} onBack={() => setSelectedPatient(null)} />
+      }
+      if (active === 'patients') return <PatientList onSelectPatient={setSelectedPatient} />
+      if (active === 'alerts') return <AlertsView />
+    }
+    return <Placeholder label={current?.label || ''} />
+  }
+
   const headerLabel = (active === 'patients' && selectedPatient)
     ? `Patients / ${selectedPatient.name}`
     : current?.label
