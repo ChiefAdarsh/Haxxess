@@ -1,7 +1,7 @@
 import os
 import tempfile
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 from dotenv import load_dotenv
 
 import librosa
@@ -47,6 +47,7 @@ app.add_middleware(
 
 _latest_acoustic: Optional[AcousticAnalysisResult] = None
 _latest_transcript: Optional[str] = None
+_latest_consolidated: Optional[Any] = None
 _wearable_profile: str = "baseline"
 
 _apple_watch = MockAppleWatch(profile=_wearable_profile)
@@ -122,6 +123,7 @@ async def get_consolidated(
     Query params:
       ?profile=anxious  → override the wearable simulation profile for this request
     """
+    global _latest_consolidated
     try:
         wearable_prof = profile if profile else _wearable_profile
         wearable_snapshot = collect_snapshot(profile=wearable_prof)
@@ -132,6 +134,8 @@ async def get_consolidated(
             # transcript_analysis=some_nlp_result,
             # behavioral_data=some_behavioral_result,
         )
+
+        _latest_consolidated = result
 
         return {
             "status": "success",
@@ -165,7 +169,7 @@ async def post_consolidated(
     All-in-one endpoint: upload audio + get back the full Vitality Index
     in a single call. If no file is provided, uses the latest cached voice data.
     """
-    global _latest_acoustic, _latest_transcript
+    global _latest_acoustic, _latest_transcript, _latest_consolidated
 
     tmp_path = None
     try:
@@ -187,6 +191,8 @@ async def post_consolidated(
             acoustic_result=_latest_acoustic,
             wearable_snapshot=wearable_snapshot,
         )
+
+        _latest_consolidated = result
 
         return {
             "status": "success",
@@ -258,16 +264,14 @@ async def wearable_stream(websocket: WebSocket):
 @app.get("/intelligence/forecast")
 async def get_forecast(profile: Optional[str] = Query(default=None)):
     """Returns the 72-hour stochastic risk forecast."""
+    global _latest_consolidated
     try:
-        wearable_prof = profile if profile else _wearable_profile
-        wearable_snapshot = collect_snapshot(profile=wearable_prof)
+        if profile or not _latest_consolidated:
+            wearable_prof = profile if profile else _wearable_profile
+            wearable_snapshot = collect_snapshot(profile=wearable_prof)
+            _latest_consolidated = consolidate(acoustic_result=_latest_acoustic, wearable_snapshot=wearable_snapshot)
 
-        result = consolidate(
-            acoustic_result=_latest_acoustic,
-            wearable_snapshot=wearable_snapshot
-        )
-
-        forecast_data = generate_predictive_risk_model(result)
+        forecast_data = generate_predictive_risk_model(_latest_consolidated)
         return {"status": "success", "data": forecast_data}
     except Exception as e:
         print(f"Error generating forecast: {e}")
@@ -277,16 +281,14 @@ async def get_forecast(profile: Optional[str] = Query(default=None)):
 @app.get("/intelligence/coaching")
 async def get_coaching_plan(profile: Optional[str] = Query(default=None)):
     """Returns the personalized diet & lifestyle coaching plan."""
+    global _latest_consolidated
     try:
-        wearable_prof = profile if profile else _wearable_profile
-        wearable_snapshot = collect_snapshot(profile=wearable_prof)
+        if profile or not _latest_consolidated:
+            wearable_prof = profile if profile else _wearable_profile
+            wearable_snapshot = collect_snapshot(profile=wearable_prof)
+            _latest_consolidated = consolidate(acoustic_result=_latest_acoustic, wearable_snapshot=wearable_snapshot)
 
-        result = consolidate(
-            acoustic_result=_latest_acoustic,
-            wearable_snapshot=wearable_snapshot
-        )
-
-        coaching_data = generate_lifestyle_coaching(result)
+        coaching_data = generate_lifestyle_coaching(_latest_consolidated)
         return {"status": "success", "data": coaching_data}
     except Exception as e:
         print(f"Error generating coaching plan: {e}")
@@ -299,18 +301,16 @@ async def chat_with_assistant(
         profile: Optional[str] = Query(default=None)
 ):
     """The Virtual Assistant endpoint. Talks back using live data."""
+    global _latest_consolidated
     try:
-        wearable_prof = profile if profile else _wearable_profile
-        wearable_snapshot = collect_snapshot(profile=wearable_prof)
-
-        result = consolidate(
-            acoustic_result=_latest_acoustic,
-            wearable_snapshot=wearable_snapshot
-        )
+        if profile or not _latest_consolidated:
+            wearable_prof = profile if profile else _wearable_profile
+            wearable_snapshot = collect_snapshot(profile=wearable_prof)
+            _latest_consolidated = consolidate(acoustic_result=_latest_acoustic, wearable_snapshot=wearable_snapshot)
 
         ai_reply = handle_virtual_assistant(
             user_message=req.message,
-            vitality_result=result,
+            vitality_result=_latest_consolidated,
             transcript=_latest_transcript
         )
 
@@ -323,16 +323,14 @@ async def chat_with_assistant(
 @app.get("/intelligence/alert")
 async def get_smart_alert(profile: Optional[str] = Query(default=None)):
     """Generates an SMS-friendly smart alert for caregivers if needed."""
+    global _latest_consolidated
     try:
-        wearable_prof = profile if profile else _wearable_profile
-        wearable_snapshot = collect_snapshot(profile=wearable_prof)
+        if profile or not _latest_consolidated:
+            wearable_prof = profile if profile else _wearable_profile
+            wearable_snapshot = collect_snapshot(profile=wearable_prof)
+            _latest_consolidated = consolidate(acoustic_result=_latest_acoustic, wearable_snapshot=wearable_snapshot)
 
-        result = consolidate(
-            acoustic_result=_latest_acoustic,
-            wearable_snapshot=wearable_snapshot
-        )
-
-        alert_data = generate_smart_alert(result)
+        alert_data = generate_smart_alert(_latest_consolidated)
         return {"status": "success", "data": alert_data}
     except Exception as e:
         print(f"Error generating smart alert: {e}")
