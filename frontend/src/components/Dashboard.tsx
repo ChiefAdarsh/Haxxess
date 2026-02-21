@@ -9,6 +9,7 @@ import AlertsView from './clinician/AlertsView'
 import PatientHome from './patient/PatientHome'
 import MessagesView from './patient/MessagesView'
 import VitalsView from './patient/VitalsView'
+import WellnessView from './patient/WellnessView'
 import { patientTabs, clinicianTabs } from '../config/tabs'
 import type { Patient } from '../config/patients'
 
@@ -55,6 +56,7 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
       if (active === 'home') return <PatientHome />
       if (active === 'vitals') return <VitalsView />
       if (active === 'messages') return <MessagesView />
+      if (active === 'wellness') return <WellnessView />
     }
     return <Placeholder label={current?.label || ''} />
   }
