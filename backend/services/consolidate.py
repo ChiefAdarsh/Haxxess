@@ -281,6 +281,65 @@ def score_wearable(snapshot: Optional[dict]) -> SignalInput:
             else:
                 sub_scores.append(75)
 
+    cgm = snapshot.get("devices", {}).get("dexcom_g7", {})
+    if cgm:
+        device_count += 1
+        rt = cgm.get("realtime", {})
+
+        glucose = rt.get("glucose_mg_dl", 100)
+        trend = rt.get("trend_key", "flat")
+        zone = rt.get("zone_urgency", "normal")
+
+        if glucose <= 54:
+            sub_scores.append(5)
+            flags.append(f"⚠ URGENT LOW glucose ({glucose} mg/dL) — hypoglycemia")
+        elif glucose <= 69:
+            sub_scores.append(35)
+            flags.append(f"Low glucose ({glucose} mg/dL)")
+        elif glucose >= 250:
+            sub_scores.append(10)
+            flags.append(f"⚠ URGENT HIGH glucose ({glucose} mg/dL) — severe hyperglycemia")
+        elif glucose >= 180:
+            sub_scores.append(45)
+            flags.append(f"High glucose ({glucose} mg/dL)")
+        elif 70 <= glucose <= 140:
+            sub_scores.append(95)
+        else:
+            sub_scores.append(75)
+
+        if trend in ("rising_fast", "falling_fast"):
+            sub_scores.append(30)
+            arrow = rt.get("trend_arrow", "?")
+            flags.append(f"Glucose changing rapidly ({arrow} {rt.get('trend_description', trend)})")
+        elif trend in ("rising", "falling"):
+            sub_scores.append(60)
+
+        daily = cgm.get("daily_summary", {})
+        tir = daily.get("time_in_range", {})
+        in_range_pct = tir.get("in_range_pct", 70)
+
+        if in_range_pct < 50:
+            sub_scores.append(30)
+            flags.append(f"CGM: poor time in range ({in_range_pct}% — target ≥70%)")
+        elif in_range_pct < 70:
+            sub_scores.append(55)
+            flags.append(f"CGM: below-target time in range ({in_range_pct}%)")
+        elif in_range_pct >= 80:
+            sub_scores.append(95)
+        else:
+            sub_scores.append(80)
+
+        cv = daily.get("coefficient_of_variation_pct", 30)
+        if cv > 36:
+            sub_scores.append(45)
+            flags.append(f"CGM: high glycemic variability (CV={cv}%)")
+
+        alerts = rt.get("alerts", [])
+        for alert in alerts:
+            if alert.get("severity") == "critical":
+                sub_scores.append(5)
+                flags.append(f"⚠ CGM ALERT: {alert.get('message', 'Unknown')}")
+
     if not sub_scores:
         return SignalInput(
             source="wearable", score=75.0, confidence=0.0,

@@ -12,7 +12,7 @@ import asyncio
 from fastapi import WebSocket, WebSocketDisconnect
 
 from services.acoustics import analyze_audio, AcousticAnalysisResult
-from services.wearable import MockOuraRing, MockAppleWatch, collect_snapshot
+from services.wearable import MockOuraRing, MockAppleWatch, collect_snapshot, MockDexcomG7
 from services.consolidate import consolidate
 
 print("     Loading AI models...")
@@ -35,6 +35,7 @@ _wearable_profile: str = "baseline"
 
 _apple_watch = MockAppleWatch(profile=_wearable_profile)
 _oura_ring = MockOuraRing(profile=_wearable_profile)
+_dexcom = MockDexcomG7(profile=_wearable_profile)
 
 
 def transcribe(file_path: str) -> str:
@@ -228,6 +229,7 @@ async def wearable_stream(websocket: WebSocket):
                 "timestamp": datetime.utcnow().isoformat() + "Z",
                 "apple_watch": _apple_watch.get_next_reading(),
                 "oura_ring": _oura_ring.get_next_reading(),
+                "dexcom_g7": _dexcom.get_next_reading(),
             }
 
             await websocket.send_json(data)
