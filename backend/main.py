@@ -15,6 +15,19 @@ from services.acoustics import analyze_audio, AcousticAnalysisResult
 from services.wearable import MockOuraRing, MockAppleWatch, collect_snapshot, MockDexcomG7
 from services.consolidate import consolidate
 
+from pydantic import BaseModel
+from services.intelligence import (
+    generate_predictive_risk_model,
+    generate_lifestyle_coaching,
+    handle_virtual_assistant,
+    generate_smart_alert
+)
+
+
+class ChatRequest(BaseModel):
+    message: str
+
+
 print("     Loading AI models...")
 _whisper_model = whisper.load_model("base")
 print("     Models loaded.")
@@ -86,10 +99,10 @@ async def analyze_voice(file: UploadFile = File(...)):
 
 @app.get("/consolidated")
 async def get_consolidated(
-    profile: Optional[str] = Query(
-        default=None,
-        description="Wearable sim profile: baseline, anxious, depressed, active, fatigued, calm",
-    ),
+        profile: Optional[str] = Query(
+            default=None,
+            description="Wearable sim profile: baseline, anxious, depressed, active, fatigued, calm",
+        ),
 ):
     """
     Returns the unified Vitality Index by fusing:
@@ -142,8 +155,8 @@ async def get_consolidated(
 
 @app.post("/consolidated")
 async def post_consolidated(
-    file: UploadFile = File(None),
-    profile: Optional[str] = Query(default=None),
+        file: UploadFile = File(None),
+        profile: Optional[str] = Query(default=None),
 ):
     """
     All-in-one endpoint: upload audio + get back the full Vitality Index
@@ -199,7 +212,7 @@ async def post_consolidated(
 
 @app.put("/settings/wearable-profile")
 async def set_wearable_profile(
-    profile: str = Query(..., description="One of: baseline, anxious, depressed, active, fatigued, calm"),
+        profile: str = Query(..., description="One of: baseline, anxious, depressed, active, fatigued, calm"),
 ):
     """Change the simulated wearable profile globally."""
     global _wearable_profile, _apple_watch, _oura_ring
@@ -218,7 +231,7 @@ async def set_wearable_profile(
 @app.websocket("/ws/wearable")
 async def wearable_stream(websocket: WebSocket):
     """
-    WebSocket endpoint that pushes Apple Watch + Oura Ring data to the frontend every 1 second.
+    WebSocket endpoint that pushes Apple Watch + Oura Ring + Glucose monitor data to the frontend every 1 second.
     """
     await websocket.accept()
     print("     Frontend connected to wearable stream!")
@@ -237,6 +250,90 @@ async def wearable_stream(websocket: WebSocket):
 
     except WebSocketDisconnect:
         print("     Frontend disconnected from wearable stream.")
+
+
+@app.get("/intelligence/forecast")
+async def get_forecast(profile: Optional[str] = Query(default=None)):
+    """Returns the 72-hour stochastic risk forecast."""
+    try:
+        wearable_prof = profile if profile else _wearable_profile
+        wearable_snapshot = collect_snapshot(profile=wearable_prof)
+
+        result = consolidate(
+            acoustic_result=_latest_acoustic,
+            wearable_snapshot=wearable_snapshot
+        )
+
+        forecast_data = generate_predictive_risk_model(result)
+        return {"status": "success", "data": forecast_data}
+    except Exception as e:
+        print(f"Error generating forecast: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/intelligence/coaching")
+async def get_coaching_plan(profile: Optional[str] = Query(default=None)):
+    """Returns the personalized diet & lifestyle coaching plan."""
+    try:
+        wearable_prof = profile if profile else _wearable_profile
+        wearable_snapshot = collect_snapshot(profile=wearable_prof)
+
+        result = consolidate(
+            acoustic_result=_latest_acoustic,
+            wearable_snapshot=wearable_snapshot
+        )
+
+        coaching_data = generate_lifestyle_coaching(result)
+        return {"status": "success", "data": coaching_data}
+    except Exception as e:
+        print(f"Error generating coaching plan: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/intelligence/chat")
+async def chat_with_assistant(
+        req: ChatRequest,
+        profile: Optional[str] = Query(default=None)
+):
+    """The Virtual Assistant endpoint. Talks back using live data."""
+    try:
+        wearable_prof = profile if profile else _wearable_profile
+        wearable_snapshot = collect_snapshot(profile=wearable_prof)
+
+        result = consolidate(
+            acoustic_result=_latest_acoustic,
+            wearable_snapshot=wearable_snapshot
+        )
+
+        ai_reply = handle_virtual_assistant(
+            user_message=req.message,
+            vitality_result=result,
+            transcript=_latest_transcript
+        )
+
+        return {"status": "success", "response": ai_reply}
+    except Exception as e:
+        print(f"Error in virtual assistant chat: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/intelligence/alert")
+async def get_smart_alert(profile: Optional[str] = Query(default=None)):
+    """Generates an SMS-friendly smart alert for caregivers if needed."""
+    try:
+        wearable_prof = profile if profile else _wearable_profile
+        wearable_snapshot = collect_snapshot(profile=wearable_prof)
+
+        result = consolidate(
+            acoustic_result=_latest_acoustic,
+            wearable_snapshot=wearable_snapshot
+        )
+
+        alert_data = generate_smart_alert(result)
+        return {"status": "success", "data": alert_data}
+    except Exception as e:
+        print(f"Error generating smart alert: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/")
