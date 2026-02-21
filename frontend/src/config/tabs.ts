@@ -1,23 +1,25 @@
 import {
-  LayoutDashboard,
+  Home,
   Activity,
-  HeartPulse,
+  TrendingUp,
   MessageCircle,
-  Bell,
   Apple,
+  Users as UsersIcon,
+  LayoutDashboard,
   Users,
   Calendar,
   DollarSign,
+  Bell,
 } from 'lucide-react'
 import type { Tab } from '../types'
 
 export const patientTabs: Tab[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'vitals', label: 'My Vitals', icon: Activity },
-  { id: 'risk', label: 'Risk Score', icon: HeartPulse },
-  { id: 'assistant', label: 'Symptom Checker', icon: MessageCircle },
-  { id: 'alerts', label: 'Reminders', icon: Bell },
-  { id: 'lifestyle', label: 'Lifestyle Plan', icon: Apple },
+  { id: 'home', label: 'Home', icon: Home },
+  { id: 'vitals', label: 'Vitals', icon: Activity },
+  { id: 'insights', label: 'Insights', icon: TrendingUp },
+  { id: 'messages', label: 'Messages', icon: MessageCircle },
+  { id: 'wellness', label: 'Wellness', icon: Apple },
+  { id: 'family', label: 'Family', icon: UsersIcon },
 ]
 
 export const clinicianTabs: Tab[] = [

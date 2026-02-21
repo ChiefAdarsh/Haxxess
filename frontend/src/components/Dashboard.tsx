@@ -25,7 +25,7 @@ function Placeholder({ label }: { label: string }) {
 
 export default function Dashboard({ role, onLogout }: DashboardProps) {
   const tabs = role === 'patient' ? patientTabs : clinicianTabs
-  const [active, setActive] = useState('dashboard')
+  const [active, setActive] = useState(role === 'patient' ? 'home' : 'dashboard')
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const current = tabs.find((t) => t.id === active)
 
