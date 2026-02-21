@@ -1,31 +1,25 @@
 import {
   Home,
-  Activity,
-  TrendingUp,
-  MessageCircle,
-  Apple,
-  Users as UsersIcon,
+  PersonStanding,
+  Clock,
+  Phone,
   LayoutDashboard,
   Users,
-  Calendar,
-  DollarSign,
-  Bell,
+  AlertTriangle,
+  FileText,
 } from 'lucide-react'
 import type { Tab } from '../types'
 
 export const patientTabs: Tab[] = [
   { id: 'home', label: 'Home', icon: Home },
-  { id: 'vitals', label: 'Vitals', icon: Activity },
-  { id: 'insights', label: 'Insights', icon: TrendingUp },
-  { id: 'messages', label: 'Messages', icon: MessageCircle },
-  { id: 'wellness', label: 'Wellness', icon: Apple },
-  { id: 'family', label: 'Family', icon: UsersIcon },
+  { id: 'bodymap', label: 'Body Map', icon: PersonStanding },
+  { id: 'history', label: 'History', icon: Clock },
+  { id: 'callin', label: 'Call In', icon: Phone },
 ]
 
 export const clinicianTabs: Tab[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'dashboard', label: 'Triage Queue', icon: LayoutDashboard },
   { id: 'patients', label: 'Patients', icon: Users },
-  { id: 'calendar', label: 'Calendar', icon: Calendar },
-  { id: 'billing', label: 'Billing', icon: DollarSign },
-  { id: 'alerts', label: 'Alerts', icon: Bell },
+  { id: 'cases', label: 'Cases', icon: FileText },
+  { id: 'alerts', label: 'Red Flags', icon: AlertTriangle },
 ]
