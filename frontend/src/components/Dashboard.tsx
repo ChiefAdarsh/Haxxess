@@ -84,6 +84,16 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
         <main style={{ flex: 1, padding: 24, overflow: 'auto' }}>
           {renderContent()}
         </main>
+
+        <footer style={{
+          padding: '10px 24px', borderTop: '1px solid #e5e7eb',
+          backgroundColor: '#fff', display: 'flex', justifyContent: 'center', gap: 20,
+          fontSize: 11, color: '#9ca3af',
+        }}>
+          <span>not for emergencies — call 911 for emergency symptoms</span>
+          <span>•</span>
+          <span>triage suggestions are informational; clinician makes final decision</span>
+        </footer>
       </div>
     </div>
   )
