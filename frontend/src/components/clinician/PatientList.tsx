@@ -25,70 +25,80 @@ export default function PatientList({ onSelectPatient }: PatientListProps) {
         <span style={{ fontSize: 13, color: '#6b7280' }}>{patients.length} patients</span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
         {patients.map((p) => (
           <button
             key={p.id}
             onClick={() => onSelectPatient(p)}
             style={{
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
-              gap: 16,
-              padding: '16px 20px',
-              borderRadius: 12,
+              padding: '44px 28px 32px',
+              borderRadius: 16,
               border: '1px solid #e5e7eb',
               backgroundColor: '#fff',
               cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'all 0.15s',
+              textAlign: 'center',
+              transition: 'all 0.2s',
+              minHeight: 0,
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#d1d5db' }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#d1d5db'
+              e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.06)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#e5e7eb'
+              e.currentTarget.style.boxShadow = 'none'
+              e.currentTarget.style.transform = 'none'
+            }}
           >
-            {/* avatar with urgency ring */}
+            {/* avatar */}
             <div style={{
-              width: 48,
-              height: 48,
-              borderRadius: 24,
-              border: `3px solid ${urgencyColor[p.urgency]}`,
+              width: 100,
+              height: 100,
+              borderRadius: 50,
+              border: `4px solid ${urgencyColor[p.urgency]}`,
               backgroundColor: '#f3f4f6',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontWeight: 600,
-              fontSize: 16,
+              fontWeight: 700,
+              fontSize: 30,
               color: '#4b5563',
-              flexShrink: 0,
-              boxShadow: p.urgency === 'critical' ? `0 0 10px ${urgencyColor[p.urgency]}40` : 'none',
+              marginBottom: 20,
+              boxShadow: p.urgency === 'critical' ? `0 0 12px ${urgencyColor[p.urgency]}40` : 'none',
               animation: p.urgency === 'critical' ? 'pulse-ring 2s ease-in-out infinite' : 'none',
             }}>
               {p.name.split(' ').map(n => n[0]).join('')}
             </div>
 
-            {/* info */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontWeight: 600, fontSize: 14, color: '#1f2937' }}>{p.name}</span>
+            {/* name centered */}
+            <span style={{ fontWeight: 600, fontSize: 18, color: '#1f2937', marginBottom: 10 }}>{p.name}</span>
+
+            {/* details left aligned */}
+            <div style={{ width: '100%', textAlign: 'left' }}>
+              <p style={{ fontSize: 14, color: '#6b7280', margin: '0 0 6px' }}>{p.condition}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: '#9ca3af' }}>Age {p.age}</span>
                 <span style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  padding: '2px 8px',
-                  borderRadius: 20,
-                  backgroundColor: `${urgencyColor[p.urgency]}15`,
-                  color: urgencyColor[p.urgency],
+                  fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20,
+                  backgroundColor: `${urgencyColor[p.urgency]}15`, color: urgencyColor[p.urgency],
                 }}>
                   {urgencyLabel[p.urgency]}
                 </span>
               </div>
-              <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
-                {p.condition} &middot; Age {p.age}
-              </p>
             </div>
 
-            {/* last visit */}
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>last visit</p>
-              <p style={{ fontSize: 13, fontWeight: 500, color: '#4b5563', margin: '2px 0 0' }}>{p.lastVisit}</p>
+            {/* footer */}
+            <div style={{
+              width: '100%', borderTop: '1px solid #f3f4f6',
+              marginTop: 16, paddingTop: 14,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>last visit</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#4b5563' }}>{p.lastVisit}</span>
             </div>
           </button>
         ))}
