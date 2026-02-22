@@ -1,18 +1,27 @@
 import os
+import re
+import base64
+import json
 import tempfile
+import threading
+import time
 from datetime import datetime, timedelta
 from typing import Optional, Any, List, Dict
+from queue import Empty, Queue
 from dotenv import load_dotenv
 
 import librosa
 import whisper
 import uvicorn
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query
+import websocket as ws_client
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import Response, StreamingResponse
 import asyncio
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
+from twilio.twiml.voice_response import Start, VoiceResponse
 
 from services.acoustics import analyze_audio, AcousticAnalysisResult
 from services.wearable import (
@@ -45,6 +54,41 @@ from services import db as db_service
 _env_dir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(_env_dir), ".env"))
+
+# ── Twilio / Deepgram config (optional — only active when env vars set) ───────
+NGROK_URL = os.getenv("NGROK_URL", "").rstrip("/")
+DEEPGRAM_KEY = os.getenv("DEEPGRAM_API_KEY")
+OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
+
+DEEPGRAM_URL = (
+    "wss://api.deepgram.com/v1/listen"
+    "?model=nova-2"
+    "&encoding=mulaw"
+    "&sample_rate=8000"
+    "&channels=1"
+    "&interim_results=true"
+    "&smart_format=true"
+    "&redact=pci"
+    "&redact=ssn"
+    "&redact=numbers"
+    "&redact=email_address"
+    "&redact=phone_number"
+)
+
+# ── SSE broadcast (for live call transcript → browser) ────────────────────────
+_browser_queues: list[Queue] = []
+_queues_lock = threading.Lock()
+
+
+def _broadcast_call(data: dict):
+    with _queues_lock:
+        for q in _browser_queues:
+            q.put(data)
+
+
+# ── Per-call transcript accumulator ───────────────────────────────────────────
+_call_transcripts: dict[str, list[str]] = {}
+_transcripts_lock = threading.Lock()
 
 VALID_PROFILES = {
     "follicular",
@@ -833,6 +877,377 @@ async def history_week_comparison(profile: Optional[str] = Query(default=None)):
     return get_week_comparison(prof)
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Twilio Call Intake — Voice webhook, Deepgram STT, rule triage, LLM extraction
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_EMERGENCY_PATTERNS = [
+    r"soak\w*\s+(pad|tampon)",
+    r"can.?t\s+breath",
+    r"faint\w*|syncop\w*|pass(?:ing|ed)\s+out|collaps\w+",
+    r"severe\s+bleed",
+    r"preg\w+.{0,60}\bbleed\w*\b|\bbleed\w*\b.{0,60}preg\w+",
+    r"preg\w+.{0,60}\bpain\b|\bpain\b.{0,60}preg\w+",
+    r"\bfever\b.{0,25}pelvic|pelvic.{0,25}\bfever\b",
+    r"\b(10|9)\s*(?:out\s*of\s*(?:10|ten)|/\s*10)\b",
+    r"help\s+me.{0,20}(bleed\w*|pain|nausea|hurt)",
+]
+
+_URGENT_PATTERNS = [
+    r"\bfever\b",
+    r"foul\s*(?:smell|discharge|odor)",
+    r"after\s+iud|iud\s+pain",
+    r"dizz\w+|lightheaded",
+    r"\b(7|8)\s*(?:out\s*of\s*(?:10|ten)|/\s*10)\b",
+    r"nausea\w*\s+and\s+vomit|vomit\w*\s+and\s+nausea",
+    r"heavy\s+bleed",
+]
+
+_ROUTINE_PATTERNS = [
+    r"\b(4|5|6)\s*(?:out\s*of\s*(?:10|ten)|/\s*10)\b",
+    r"\b(week|weeks|month|months)\b.{0,20}\bpain\b",
+    r"irregular\s+period",
+    r"\bcramp\w+\b",
+    r"\bdiscomfort\b",
+]
+
+_TRIAGE_DEFS = {
+    "emergency": {
+        "level": "emergency",
+        "label": "Emergency",
+        "color": "#ef4444",
+        "bg": "#2d0c0c",
+        "action": "Call 911 or go to the Emergency Room immediately.",
+    },
+    "urgent": {
+        "level": "urgent",
+        "label": "Same-Day Urgent",
+        "color": "#f97316",
+        "bg": "#2a1200",
+        "action": "Contact your healthcare provider today for a same-day appointment.",
+    },
+    "routine": {
+        "level": "routine",
+        "label": "Routine Follow-Up",
+        "color": "#eab308",
+        "bg": "#1e1500",
+        "action": "Schedule an appointment within the next few days.",
+    },
+    "self_care": {
+        "level": "self_care",
+        "label": "Self-Care & Monitor",
+        "color": "#22c55e",
+        "bg": "#061a0e",
+        "action": "Monitor your symptoms. Seek care if they worsen or new symptoms appear.",
+    },
+}
+
+
+def _match_any(patterns: list, text: str) -> Optional[str]:
+    for p in patterns:
+        m = re.search(p, text, re.IGNORECASE)
+        if m:
+            return m.group(0)
+    return None
+
+
+def rule_triage(text: str) -> dict:
+    hit = _match_any(_EMERGENCY_PATTERNS, text)
+    if hit:
+        t = dict(_TRIAGE_DEFS["emergency"])
+        t["reason"] = f'Red-flag phrase detected: "{hit}"'
+        return t
+
+    hit = _match_any(_URGENT_PATTERNS, text)
+    if hit:
+        t = dict(_TRIAGE_DEFS["urgent"])
+        t["reason"] = f'Urgency indicator: "{hit}"'
+        return t
+
+    m = re.search(r"(\d+)\s*(?:out\s*of\s*(?:10|ten)|/\s*10)", text, re.IGNORECASE)
+    if m:
+        sev = int(m.group(1))
+        if sev >= 9:
+            t = dict(_TRIAGE_DEFS["emergency"])
+            t["reason"] = f"Severity reported as {sev}/10"
+            return t
+        if sev >= 7:
+            t = dict(_TRIAGE_DEFS["urgent"])
+            t["reason"] = f"Severity reported as {sev}/10"
+            return t
+        if sev >= 4:
+            t = dict(_TRIAGE_DEFS["routine"])
+            t["reason"] = f"Severity reported as {sev}/10"
+            return t
+
+    hit = _match_any(_ROUTINE_PATTERNS, text)
+    if hit:
+        t = dict(_TRIAGE_DEFS["routine"])
+        t["reason"] = f'Symptom indicator: "{hit}"'
+        return t
+
+    t = dict(_TRIAGE_DEFS["self_care"])
+    t["reason"] = "No urgent flags detected in transcript."
+    return t
+
+
+_EXTRACTION_PROMPT = """\
+You are a clinical intake assistant extracting structured data from a patient's spoken symptom description.
+
+Return ONLY a valid JSON object with these exact fields (use null for unknown):
+{
+  "summary": "<one-sentence chief complaint>",
+  "symptoms": ["<symptom1>", "..."],
+  "body_regions": ["<region>"],
+  "severity": <integer 0-10 or null>,
+  "onset": "<when symptoms started or null>",
+  "duration": "<how long or null>",
+  "bleeding": <true | false | null>,
+  "bleeding_amount": "<description or null>",
+  "pregnancy_status": "<positive | negative | unknown>",
+  "fever": <true | false | null>,
+  "triggers": ["<trigger1>", "..."],
+  "other_notes": "<anything else relevant or null>"
+}
+
+Patient transcript:
+"""
+
+
+def llm_extract(text: str) -> dict:
+    if not OPENROUTER_KEY:
+        return {"summary": "LLM extraction unavailable (configure OPENROUTER_API_KEY).", "error": "no_key"}
+
+    try:
+        import openai
+        client = openai.OpenAI(
+            api_key=OPENROUTER_KEY,
+            base_url="https://openrouter.ai/api/v1",
+            default_headers={"HTTP-Referer": "https://haxxess.app"},
+        )
+        resp = client.chat.completions.create(
+            model="google/gemini-2.0-flash-exp:free",
+            messages=[
+                {"role": "system", "content": "You extract medical intake data. Return only valid JSON."},
+                {"role": "user", "content": _EXTRACTION_PROMPT + text},
+            ],
+            temperature=0,
+            max_tokens=600,
+        )
+        raw = resp.choices[0].message.content.strip()
+        raw = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.MULTILINE).strip()
+        return json.loads(raw)
+    except Exception as e:
+        print(f"LLM extraction error: {e}")
+        return {"summary": "Extraction failed.", "error": str(e)}
+
+
+def _extract_and_triage(call_sid: str):
+    """Background thread: runs after a Twilio call ends."""
+    _broadcast_call({"type": "processing", "call_sid": call_sid})
+
+    with _transcripts_lock:
+        lines = list(_call_transcripts.get(call_sid, []))
+
+    full_text = " ".join(lines).strip()
+    print(f"Processing transcript ({len(full_text)} chars) for {call_sid}")
+
+    if not full_text:
+        _broadcast_call({
+            "type": "case_ready",
+            "call_sid": call_sid,
+            "transcript": "",
+            "triage": {**_TRIAGE_DEFS["self_care"], "reason": "No speech captured."},
+            "entities": {"summary": "No speech was detected during this call."},
+        })
+        return
+
+    triage = rule_triage(full_text)
+    entities = llm_extract(full_text)
+
+    print(f"Triage [{call_sid}]: {triage['level']} — {triage['reason']}")
+
+    _broadcast_call({
+        "type": "case_ready",
+        "call_sid": call_sid,
+        "transcript": full_text,
+        "triage": triage,
+        "entities": entities,
+    })
+
+    with _transcripts_lock:
+        _call_transcripts.pop(call_sid, None)
+
+
+INTAKE_PROMPT = (
+    "Hello. You have reached the symptom intake line. "
+    "After this message, please describe your symptoms freely. "
+    "Tell me where you feel discomfort, how severe it is on a scale of zero to ten, "
+    "and how long you have been experiencing this. "
+    "You may also mention any fever, bleeding, nausea, pregnancy, or other concerns. "
+    "Take your time — I am listening."
+)
+
+
+@app.post("/voice")
+async def twilio_voice_webhook():
+    """Twilio voice webhook — returns TwiML that starts a media stream."""
+    wss_url = NGROK_URL.replace("https://", "wss://")
+
+    resp = VoiceResponse()
+    resp.say(INTAKE_PROMPT, voice="alice")
+
+    start = Start()
+    start.stream(url=f"{wss_url}/media-stream")
+    resp.append(start)
+
+    resp.pause(length=75)
+
+    resp.say(
+        "Thank you. Your symptoms have been recorded and are being analyzed. "
+        "You may hang up now.",
+        voice="alice",
+    )
+    resp.pause(length=5)
+    return Response(content=str(resp), media_type="text/xml")
+
+
+@app.websocket("/media-stream")
+async def twilio_media_stream(ws: WebSocket):
+    """Twilio media stream → Deepgram Nova-2 real-time STT."""
+    await ws.accept()
+    print("Twilio media stream connected")
+
+    call_sid_ref: list[Optional[str]] = [None]
+    dg_ws_ref: list = [None]
+
+    def on_dg_open(dg):
+        dg_ws_ref[0] = dg
+        print("Deepgram connection open")
+
+    def on_dg_message(dg, message):
+        data = json.loads(message)
+        if data.get("type") != "Results":
+            return
+        alts = data.get("channel", {}).get("alternatives", [{}])
+        transcript = alts[0].get("transcript", "") if alts else ""
+        is_final = data.get("is_final", False)
+        if not transcript:
+            return
+
+        if is_final and call_sid_ref[0]:
+            with _transcripts_lock:
+                _call_transcripts.setdefault(call_sid_ref[0], []).append(transcript)
+
+        _broadcast_call({
+            "type": "transcript",
+            "text": transcript,
+            "is_final": is_final,
+            "call_sid": call_sid_ref[0],
+        })
+
+    def on_dg_error(dg, error):
+        print(f"Deepgram error: {error}")
+        _broadcast_call({"type": "error", "message": str(error)})
+
+    def on_dg_close(dg, close_status_code, close_msg):
+        print(f"Deepgram closed: {close_status_code} {close_msg}")
+
+    dg = ws_client.WebSocketApp(
+        DEEPGRAM_URL,
+        header={"Authorization": f"Token {DEEPGRAM_KEY}"},
+        on_open=on_dg_open,
+        on_message=on_dg_message,
+        on_error=on_dg_error,
+        on_close=on_dg_close,
+    )
+
+    dg_thread = threading.Thread(target=dg.run_forever, daemon=True)
+    dg_thread.start()
+
+    for _ in range(30):
+        if dg_ws_ref[0] is not None:
+            break
+        await asyncio.sleep(0.1)
+
+    try:
+        while True:
+            msg = await ws.receive_text()
+            data = json.loads(msg)
+            event = data.get("event")
+
+            if event == "start":
+                call_sid_ref[0] = data["start"]["callSid"]
+                print(f"Stream started | call: {call_sid_ref[0]}")
+                _broadcast_call({"type": "call_started", "call_sid": call_sid_ref[0]})
+
+            elif event == "media":
+                if dg_ws_ref[0]:
+                    audio = base64.b64decode(data["media"]["payload"])
+                    dg_ws_ref[0].send(audio, ws_client.ABNF.OPCODE_BINARY)
+
+            elif event == "stop":
+                sid = call_sid_ref[0]
+                print(f"Stream stopped | call: {sid}")
+                _broadcast_call({"type": "call_ended", "call_sid": sid})
+                if sid:
+                    threading.Thread(
+                        target=_extract_and_triage,
+                        args=(sid,),
+                        daemon=True,
+                    ).start()
+                break
+
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if dg_ws_ref[0]:
+            try:
+                dg_ws_ref[0].close()
+            except Exception:
+                pass
+        print("Media stream handler done")
+
+
+@app.get("/transcript-stream")
+async def transcript_stream():
+    """SSE endpoint — browser subscribes for live call transcripts + triage results."""
+    q: Queue = Queue()
+    with _queues_lock:
+        _browser_queues.append(q)
+
+    async def generate():
+        try:
+            while True:
+                try:
+                    data = await asyncio.get_event_loop().run_in_executor(
+                        None, lambda: q.get(timeout=20)
+                    )
+                    yield f"data: {json.dumps(data)}\n\n"
+                except Empty:
+                    yield ": keep-alive\n\n"
+        finally:
+            with _queues_lock:
+                _browser_queues.remove(q)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/call-status")
+async def call_status_webhook(
+    CallSid: str = Form(None),
+    CallStatus: str = Form(None),
+):
+    """Twilio status callback."""
+    print(f"Call status [{CallSid}] {CallStatus}")
+    _broadcast_call({"type": "call_status", "call_sid": CallSid, "status": CallStatus})
+    return Response(status_code=204)
+
+
 @app.get("/")
 def health_check():
     return {
@@ -844,5 +1259,5 @@ def health_check():
 
 
 if __name__ == "__main__":
-    print("\n🌸 Starting Vitality API on http://localhost:8000")
+    print("\n Starting Vitality API on http://localhost:8000")
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

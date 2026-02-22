@@ -3,6 +3,7 @@ import {
   PersonStanding,
   Clock,
   Phone,
+  PhoneIncoming,
   Calendar,
   CalendarDays,
   Activity,
@@ -33,6 +34,7 @@ export const clinicianTabs: Tab[] = [
   { id: "dashboard", label: "Triage Queue", icon: LayoutDashboard },
   { id: "patients", label: "Patients", icon: Users },
   { id: "cases", label: "Cases", icon: FileText },
+  { id: "intake", label: "Live Intake", icon: PhoneIncoming },
   { id: "alerts", label: "Live Alerts", icon: AlertTriangle },
   { id: "calendar", label: "Calendar", icon: Calendar },
 ];

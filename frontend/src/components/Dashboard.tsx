@@ -14,6 +14,7 @@ import MessagesView from "./patient/MessagesView";
 import VitalsView from "./patient/VitalsView";
 import WellnessView from "./patient/WellnessView";
 import CasesView from "./clinician/CasesView";
+import LiveIntake from "./clinician/LiveIntake";
 import CalendarView from "./clinician/CalendarView";
 import PatientCalendarView from "./patient/PatientCalendarView";
 import { patientTabs, clinicianTabs } from "../config/tabs";
@@ -113,6 +114,8 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
           );
         case "cases":
           return <CasesView onSelectPatient={handleSelectPatient} />;
+        case "intake":
+          return <LiveIntake />;
         case "alerts":
           return <AlertsView />;
         case "calendar":
