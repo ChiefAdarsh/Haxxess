@@ -14,6 +14,7 @@ import {
   Users,
   AlertTriangle,
   FileText,
+  History,
 } from "lucide-react";
 import type { Tab } from "../types";
 
@@ -35,6 +36,7 @@ export const clinicianTabs: Tab[] = [
   { id: "patients", label: "Patients", icon: Users },
   { id: "cases", label: "Cases", icon: FileText },
   { id: "intake", label: "Live Intake", icon: PhoneIncoming },
+  { id: "callhistory", label: "Call History", icon: History },
   { id: "alerts", label: "Live Alerts", icon: AlertTriangle },
   { id: "calendar", label: "Calendar", icon: Calendar },
 ];

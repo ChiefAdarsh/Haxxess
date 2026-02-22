@@ -14,8 +14,9 @@ export function getConsolidated(profile?: string) {
 }
 
 // get current status snapshot
-export function getStatus() {
-  return request<any>("/status");
+export function getStatus(profile?: string) {
+  const q = profile ? `?profile=${profile}` : "";
+  return request<any>(`/status${q}`);
 }
 
 // get smart alert
@@ -162,6 +163,29 @@ export function createAppointment(entry: {
       patient_name: entry.patient_name ?? undefined,
     }),
   });
+}
+
+export function getCallHistory(patientId?: string) {
+  const q = patientId ? `?patient_id=${patientId}` : "";
+  return request<{
+    status: string;
+    calls: Array<{
+      call_sid: string;
+      patient_id: string;
+      patient_name: string;
+      timestamp: string;
+      transcript: string;
+      triage: {
+        level: string;
+        label: string;
+        color: string;
+        bg: string;
+        reason: string;
+        action: string;
+      };
+      entities: Record<string, any>;
+    }>;
+  }>(`/call-history${q}`);
 }
 
 // Wearable live stream WebSocket (same host as API)

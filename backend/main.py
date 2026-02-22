@@ -90,6 +90,14 @@ def _broadcast_call(data: dict):
 _call_transcripts: dict[str, list[str]] = {}
 _transcripts_lock = threading.Lock()
 
+# ── Call history (persisted per-patient) ──────────────────────────────────────
+_call_history: list[dict] = []
+_call_history_lock = threading.Lock()
+DEFAULT_PATIENT_ID = "1"          # Maria Santos
+DEFAULT_PATIENT_NAME = "Maria Santos"
+
+_main_event_loop: asyncio.AbstractEventLoop | None = None
+
 VALID_PROFILES = {
     "follicular",
     "ovulation",
@@ -245,7 +253,8 @@ def _seed_sample_data():
 
 @app.on_event("startup")
 async def startup_load_profile():
-    global _wearable_profile, _apple_watch, _oura_ring, _dexcom, VALID_PROFILES
+    global _wearable_profile, _apple_watch, _oura_ring, _dexcom, VALID_PROFILES, _main_event_loop
+    _main_event_loop = asyncio.get_event_loop()
     if db_service.MONGODB_URI:
         try:
             seed_data = _seed_sample_data()
@@ -273,11 +282,15 @@ def _resolve_profile(profile: Optional[str]) -> str:
     return profile if profile and profile in VALID_PROFILES else _wearable_profile
 
 
+_consolidated_ts: float = 0.0
+_CONSOLIDATED_TTL = 5.0  # seconds — serves same result within this window
+
 async def _ensure_consolidated(profile: Optional[str] = None) -> Any:
-    """Rebuild consolidated result if needed (uses DB when MONGODB_URI set)."""
-    global _latest_consolidated
+    """Rebuild consolidated result with a short TTL cache so all views share the same score."""
+    global _latest_consolidated, _consolidated_ts
     prof = _resolve_profile(profile)
-    if profile or not _latest_consolidated:
+    now = time.time()
+    if _latest_consolidated is None or (now - _consolidated_ts) > _CONSOLIDATED_TTL:
         snapshot = collect_snapshot(profile=prof)
         periods = await _get_cycle_periods_list()
         symptom_logs = await _get_symptom_logs(30)
@@ -288,6 +301,7 @@ async def _ensure_consolidated(profile: Optional[str] = None) -> Any:
             symptom_logs=symptom_logs,
             cycle_periods_context=_cycle_periods_context(periods),
         )
+        _consolidated_ts = now
     return _latest_consolidated
 
 
@@ -476,20 +490,9 @@ async def call_triage(file: UploadFile = File(...)):
 async def get_consolidated(
     profile: Optional[str] = Query(default=None),
 ):
-    global _latest_consolidated
     try:
+        result = await _ensure_consolidated(profile)
         prof = _resolve_profile(profile)
-        snapshot = collect_snapshot(profile=prof)
-        periods = await _get_cycle_periods_list()
-        symptom_logs = await _get_symptom_logs(30)
-        result = consolidate(
-            acoustic_result=_latest_acoustic,
-            wearable_snapshot=snapshot,
-            profile=prof,
-            symptom_logs=symptom_logs,
-            cycle_periods_context=_cycle_periods_context(periods),
-        )
-        _latest_consolidated = result
 
         return {
             "status": "success",
@@ -575,18 +578,9 @@ async def post_consolidated(
 
 
 @app.get("/status")
-async def get_status():
-    prof = _wearable_profile
-    snapshot = collect_snapshot(profile=prof)
-    periods = await _get_cycle_periods_list()
-    symptom_logs = await _get_symptom_logs(30)
-    result = consolidate(
-        acoustic_result=_latest_acoustic,
-        wearable_snapshot=snapshot,
-        profile=prof,
-        symptom_logs=symptom_logs,
-        cycle_periods_context=_cycle_periods_context(periods),
-    )
+async def get_status(profile: Optional[str] = Query(default=None)):
+    result = await _ensure_consolidated(profile)
+    prof = _resolve_profile(profile)
 
     return {
         "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -1026,7 +1020,7 @@ def llm_extract(text: str) -> dict:
             default_headers={"HTTP-Referer": "https://haxxess.app"},
         )
         resp = client.chat.completions.create(
-            model="google/gemini-2.0-flash-exp:free",
+            model="google/gemini-2.5-flash-lite",
             messages=[
                 {"role": "system", "content": "You extract medical intake data. Return only valid JSON."},
                 {"role": "user", "content": _EXTRACTION_PROMPT + text},
@@ -1067,13 +1061,33 @@ def _extract_and_triage(call_sid: str):
 
     print(f"Triage [{call_sid}]: {triage['level']} — {triage['reason']}")
 
-    _broadcast_call({
+    case_payload = {
         "type": "case_ready",
         "call_sid": call_sid,
         "transcript": full_text,
         "triage": triage,
         "entities": entities,
-    })
+    }
+    _broadcast_call(case_payload)
+
+    record = {
+        "call_sid": call_sid,
+        "patient_id": DEFAULT_PATIENT_ID,
+        "patient_name": DEFAULT_PATIENT_NAME,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "transcript": full_text,
+        "triage": triage,
+        "entities": entities,
+    }
+    with _call_history_lock:
+        _call_history.append(record)
+    if db_service.MONGODB_URI and _main_event_loop:
+        try:
+            asyncio.run_coroutine_threadsafe(
+                db_service.db_add_call_record(record), _main_event_loop
+            )
+        except Exception as e:
+            print(f"DB call-history save error: {e}")
 
     with _transcripts_lock:
         _call_transcripts.pop(call_sid, None)
@@ -1246,6 +1260,20 @@ async def call_status_webhook(
     print(f"Call status [{CallSid}] {CallStatus}")
     _broadcast_call({"type": "call_status", "call_sid": CallSid, "status": CallStatus})
     return Response(status_code=204)
+
+
+@app.get("/call-history")
+async def get_call_history(patient_id: Optional[str] = Query(None)):
+    """Return persisted call records, optionally filtered by patient_id."""
+    if db_service.MONGODB_URI:
+        records = await db_service.db_get_call_history(patient_id)
+    else:
+        with _call_history_lock:
+            records = list(_call_history)
+        if patient_id:
+            records = [r for r in records if r.get("patient_id") == patient_id]
+    records.sort(key=lambda r: r.get("timestamp", ""), reverse=True)
+    return {"status": "success", "calls": records}
 
 
 @app.get("/")

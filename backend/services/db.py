@@ -182,6 +182,29 @@ async def db_get_all_profiles() -> Dict[str, Dict[str, Any]]:
     return out
 
 
+# --- Call history ---
+COLL_CALLS = "call_history"
+
+
+async def db_add_call_record(rec: Dict[str, Any]) -> None:
+    if not MONGODB_URI:
+        return
+    coll = get_db()[COLL_CALLS]
+    await coll.insert_one(dict(rec))
+
+
+async def db_get_call_history(patient_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    if not MONGODB_URI:
+        return []
+    coll = get_db()[COLL_CALLS]
+    q: Dict[str, Any] = {}
+    if patient_id:
+        q["patient_id"] = patient_id
+    cursor = coll.find(q).sort("timestamp", -1)
+    raw = await cursor.to_list(length=500)
+    return [_to_json_safe(d) for d in raw]
+
+
 async def db_seed_profiles(profiles_dict: Dict[str, Dict[str, Any]]) -> None:
     if not MONGODB_URI or not profiles_dict:
         return

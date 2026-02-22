@@ -20,6 +20,7 @@ import {
   getSymptoms,
   getStatus,
   getHistoryTrends,
+  getCallHistory,
 } from "../../api/client";
 import type { Patient } from "../../config/patients";
 
@@ -41,13 +42,15 @@ export default function PatientDetail({ patient, onBack }: PatientDetailProps) {
   const [alertData, setAlertData] = useState<any>(null);
   const [symptoms, setSymptoms] = useState<any[]>([]);
   const [historyTrends, setHistoryTrends] = useState<any>(null);
+  const [callRecords, setCallRecords] = useState<any[]>([]);
+  const [expandedCall, setExpandedCall] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [vitRes, statusRes, foreRes, alertRes, symptomsRes, trendsRes] =
+        const [vitRes, statusRes, foreRes, alertRes, symptomsRes, trendsRes, callRes] =
           await Promise.all([
             getConsolidated(),
             getStatus().catch(() => null),
@@ -55,6 +58,7 @@ export default function PatientDetail({ patient, onBack }: PatientDetailProps) {
             getSmartAlert(),
             getSymptoms(30).catch(() => ({ symptoms: [] })),
             getHistoryTrends(undefined, 14).catch(() => null),
+            getCallHistory(patient.id).catch(() => ({ calls: [] })),
           ]);
         if (vitRes) setLiveData(vitRes);
         if (statusRes) setStatusData(statusRes);
@@ -62,6 +66,7 @@ export default function PatientDetail({ patient, onBack }: PatientDetailProps) {
         if (alertRes?.data) setAlertData(alertRes.data);
         if (Array.isArray(symptomsRes?.symptoms)) setSymptoms(symptomsRes.symptoms);
         if (trendsRes?.trends) setHistoryTrends(trendsRes.trends);
+        if (Array.isArray(callRes?.calls)) setCallRecords(callRes.calls);
       } catch {
       } finally {
         setLoading(false);
@@ -474,6 +479,109 @@ export default function PatientDetail({ patient, onBack }: PatientDetailProps) {
                       <span className="text-xs text-slate-400 shrink-0">
                         {s.timestamp ? new Date(s.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : ""}
                       </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Call History */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+            <div className="flex items-center gap-2.5 mb-4">
+              <Phone size={16} className="text-pink-700" />
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Call History
+              </h3>
+              {callRecords.length > 0 && (
+                <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-50 border border-pink-200 text-pink-700">
+                  {callRecords.length} call{callRecords.length !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+            {loading ? (
+              <p className="text-sm text-slate-400 py-2">Loading...</p>
+            ) : callRecords.length === 0 ? (
+              <p className="text-sm text-slate-500 py-2">No call history for this patient.</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {callRecords.map((call: any) => {
+                  const triage = call.triage || {};
+                  const entities = call.entities || {};
+                  const level = triage.level || "self_care";
+                  const triageColor =
+                    level === "emergency" ? "#dc2626" :
+                    level === "urgent" ? "#f59e0b" :
+                    level === "routine" ? "#2563eb" : "#10b981";
+                  const triageLabel =
+                    level === "emergency" ? "Emergency" :
+                    level === "urgent" ? "Urgent" :
+                    level === "routine" ? "Routine" : "Self-Care";
+                  const isExpanded = expandedCall === call.call_sid;
+                  return (
+                    <div key={call.call_sid} className="rounded-xl border border-slate-100 overflow-hidden">
+                      <button
+                        onClick={() => setExpandedCall(isExpanded ? null : call.call_sid)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-50/50 transition-colors cursor-pointer"
+                      >
+                        <div
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: triageColor }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className="text-[10px] font-bold uppercase px-2 py-0.5 rounded"
+                              style={{ color: triageColor, backgroundColor: `${triageColor}15` }}
+                            >
+                              {triageLabel}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              {call.timestamp ? new Date(call.timestamp).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}
+                            </span>
+                          </div>
+                          {entities.summary && (
+                            <p className="text-sm text-slate-700 mt-1 truncate">{entities.summary}</p>
+                          )}
+                        </div>
+                        <span className="text-slate-400 shrink-0 text-xs">{isExpanded ? "▲" : "▼"}</span>
+                      </button>
+                      {isExpanded && (
+                        <div className="px-4 pb-4 pt-1 border-t border-slate-100 space-y-3">
+                          {triage.reason && (
+                            <div className="rounded-lg p-3 border" style={{ backgroundColor: `${triageColor}08`, borderColor: `${triageColor}30` }}>
+                              <p className="text-xs font-semibold" style={{ color: triageColor }}>{triageLabel}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">{triage.reason}</p>
+                              {triage.action && <p className="text-xs text-slate-600 mt-1 font-medium">{triage.action}</p>}
+                            </div>
+                          )}
+                          {call.transcript && (
+                            <div className="rounded-lg bg-slate-50 border border-slate-100 p-3">
+                              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1">Transcript</p>
+                              <p className="text-sm text-slate-700 leading-relaxed">{call.transcript}</p>
+                            </div>
+                          )}
+                          {entities.symptoms && entities.symptoms.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {entities.symptoms.map((s: string, i: number) => (
+                                <span key={i} className="rounded-full bg-purple-50 border border-purple-200 px-2.5 py-0.5 text-[11px] font-medium text-purple-700">{s}</span>
+                              ))}
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {entities.severity != null && (
+                              <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
+                                <span className="text-slate-400 font-semibold">Severity:</span> <span className="font-bold text-slate-700">{entities.severity}/10</span>
+                              </div>
+                            )}
+                            {entities.onset && (
+                              <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
+                                <span className="text-slate-400 font-semibold">Onset:</span> <span className="text-slate-700">{entities.onset}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
