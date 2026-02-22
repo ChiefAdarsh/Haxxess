@@ -3,6 +3,7 @@ import {
   PersonStanding,
   Clock,
   Phone,
+  Calendar,
   CalendarDays,
   Activity,
   MessageCircle,
@@ -23,6 +24,7 @@ export const patientTabs: Tab[] = [
   { id: "bodymap", label: "Body Map", icon: PersonStanding },
   { id: "tracker", label: "Symptom Tracker", icon: Activity },
   { id: "cycle", label: "Cycle", icon: CalendarDays },
+  { id: "calendar", label: "Calendar", icon: Calendar },
   { id: "history", label: "History", icon: Clock },
   { id: "callin", label: "Call In", icon: Phone },
 ];
@@ -32,4 +34,5 @@ export const clinicianTabs: Tab[] = [
   { id: "patients", label: "Patients", icon: Users },
   { id: "cases", label: "Cases", icon: FileText },
   { id: "alerts", label: "Live Alerts", icon: AlertTriangle },
+  { id: "calendar", label: "Calendar", icon: Calendar },
 ];

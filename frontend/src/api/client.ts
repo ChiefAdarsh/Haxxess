@@ -132,6 +132,33 @@ export function getSymptoms(days = 30) {
   return request<any>(`/symptoms?days=${days}`);
 }
 
+// Calendar / appointments (patient schedules → shows on clinician calendar)
+export function getAppointments(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams();
+  if (fromDate) params.set("from_date", fromDate);
+  if (toDate) params.set("to_date", toDate);
+  const q = params.toString() ? `?${params}` : "";
+  return request<{ status: string; appointments: Array<{ id: string; date: string; time: string; type: string; patient_name: string }> }>(`/calendar/appointments${q}`);
+}
+
+export function createAppointment(entry: {
+  date: string;
+  time: string;
+  type?: string;
+  patient_name?: string;
+}) {
+  return request<any>("/calendar/appointments", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      date: entry.date,
+      time: entry.time,
+      type: entry.type ?? "Visit",
+      patient_name: entry.patient_name ?? undefined,
+    }),
+  });
+}
+
 // Wearable live stream WebSocket (same host as API)
 export const WEARABLE_WS_URL =
   (BASE.replace(/^http/, "ws") as string) + "/ws/wearable";

@@ -14,6 +14,8 @@ import MessagesView from "./patient/MessagesView";
 import VitalsView from "./patient/VitalsView";
 import WellnessView from "./patient/WellnessView";
 import CasesView from "./clinician/CasesView";
+import CalendarView from "./clinician/CalendarView";
+import PatientCalendarView from "./patient/PatientCalendarView";
 import { patientTabs, clinicianTabs } from "../config/tabs";
 import type { Patient } from "../config/patients";
 import { Sparkles } from "lucide-react";
@@ -87,6 +89,8 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
           return <PatientTracker />;
         case "cycle":
           return <PatientCycle />;
+        case "calendar":
+          return <PatientCalendarView />;
         case "callin":
           return <CallIn />;
         default:
@@ -111,6 +115,8 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
           return <CasesView onSelectPatient={handleSelectPatient} />;
         case "alerts":
           return <AlertsView />;
+        case "calendar":
+          return <CalendarView onSelectPatient={handleSelectPatient} />;
         default:
           return <Placeholder label={current?.label ?? ""} />;
       }

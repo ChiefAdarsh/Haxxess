@@ -81,9 +81,18 @@ class SymptomEntryPayload(BaseModel):
     notes: str = ""
 
 
+class AppointmentCreate(BaseModel):
+    """Request to create an appointment (patient schedules)."""
+    date: str  # YYYY-MM-DD
+    time: str  # e.g. "09:00" or "9:00 AM"
+    type: str = "Visit"  # reason / visit type
+    patient_name: Optional[str] = None  # display name; can be set by frontend
+
+
 # In-memory stores (hackathon-safe). In production, replace with DB keyed by patient_id.
 _cycle_periods: List[PeriodEvent] = []
 _symptom_logs: List[Dict[str, Any]] = []
+_appointments: List[Dict[str, Any]] = []
 
 
 print("     Loading AI models...")
@@ -543,6 +552,36 @@ async def add_symptoms_bulk(entries: List[SymptomEntryPayload]):
         }
         _symptom_logs.append(rec)
     return {"status": "success", "count": len(entries)}
+
+
+@app.get("/calendar/appointments")
+async def get_appointments(
+    from_date: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+):
+    """Return scheduled appointments. Optional from_date/to_date (YYYY-MM-DD) to filter."""
+    out = list(_appointments)
+    if from_date:
+        out = [a for a in out if (a.get("date") or "") >= from_date]
+    if to_date:
+        out = [a for a in out if (a.get("date") or "") <= to_date]
+    out.sort(key=lambda a: (a.get("date", ""), a.get("time", "")))
+    return {"status": "success", "appointments": out}
+
+
+@app.post("/calendar/appointments")
+async def create_appointment(body: AppointmentCreate):
+    """Patient schedules an appointment; shows on clinician calendar."""
+    global _appointments
+    rec = {
+        "id": f"apt_{datetime.utcnow().timestamp():.0f}",
+        "date": body.date,
+        "time": body.time,
+        "type": body.type or "Visit",
+        "patient_name": body.patient_name or "Patient",
+    }
+    _appointments.append(rec)
+    return {"status": "success", "appointment": rec}
 
 
 @app.put("/settings/wearable-profile")

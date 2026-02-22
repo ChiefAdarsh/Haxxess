@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Heart,
   Droplets,
@@ -60,9 +60,13 @@ export default function VitalsView() {
 
   const [history, setHistory] = useState(initialHistory);
 
-  // Connect to the Python FastAPI WebSocket for live Wearable/FemTech data
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [connectKey, setConnectKey] = useState(0);
+
+  // Connect to the Python FastAPI WebSocket for live Wearable/FemTech data; auto-reconnect on close/error
   useEffect(() => {
-    const ws = new WebSocket(WEARABLE_WS_URL);
+    const url = WEARABLE_WS_URL;
+    const ws = new WebSocket(url);
 
     ws.onopen = () => setLiveData((prev) => ({ ...prev, status: "connected" }));
 
@@ -75,22 +79,21 @@ export default function VitalsView() {
       }
       if (!data || typeof data !== "object") return;
 
-      // Extract live values from backend WS payload (apple_watch, oura_ring, dexcom_g7)
       const aw = data.apple_watch as Record<string, unknown> | undefined;
       const bp = aw?.blood_pressure as { systolic_mmhg?: number; diastolic_mmhg?: number } | undefined;
-      const hr = (aw?.heart_rate_bpm as number | undefined) ?? liveData.hr;
-      const sys = bp?.systolic_mmhg ?? liveData.sys;
-      const dia = bp?.diastolic_mmhg ?? liveData.dia;
-
       const dexcom = data.dexcom_g7 as Record<string, unknown> | undefined;
-      const glucose = (dexcom?.glucose_mg_dl as number | undefined) ?? liveData.glucose;
-      const glucoseTrend = (dexcom?.trend_key as string | undefined) ?? "stable";
-
       const oura = data.oura_ring as Record<string, unknown> | undefined;
+
+      const hr = (aw?.heart_rate_bpm as number | undefined) ?? 72;
+      const sys = bp?.systolic_mmhg ?? 128;
+      const dia = bp?.diastolic_mmhg ?? 84;
+      const glucose = (dexcom?.glucose_mg_dl as number | undefined) ?? 105;
+      const glucoseTrend = (dexcom?.trend_key as string | undefined) ?? "stable";
       const tempDelta = (oura?.skin_temperature_delta_c as number | undefined) ?? 0;
       const currentTemp = Number((36.5 + tempDelta).toFixed(1));
 
       setLiveData((prev) => ({
+        ...prev,
         hr,
         sys,
         dia,
@@ -109,13 +112,26 @@ export default function VitalsView() {
       }));
     };
 
-    ws.onerror = () =>
+    const scheduleReconnect = () => {
       setLiveData((prev) => ({ ...prev, status: "disconnected" }));
-    ws.onclose = () =>
-      setLiveData((prev) => ({ ...prev, status: "disconnected" }));
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+        setConnectKey((k) => k + 1);
+      }, 3000);
+    };
 
-    return () => ws.close();
-  }, []);
+    ws.onerror = scheduleReconnect;
+    ws.onclose = scheduleReconnect;
+
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      ws.close();
+    };
+  }, [connectKey]);
 
   // Map the live data into the UI structure
   const vitals = [
@@ -184,21 +200,41 @@ export default function VitalsView() {
         >
           My Live Vitals
         </h2>
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            padding: "4px 10px",
-            borderRadius: 12,
-            backgroundColor:
-              liveData.status === "connected" ? "#d1fae5" : "#fee2e2",
-            color: liveData.status === "connected" ? "#065f46" : "#991b1b",
-          }}
-        >
-          {liveData.status === "connected"
-            ? `🟢 Live — Last synced: ${liveData.lastSynced}`
-            : "🔴 Disconnected"}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              padding: "4px 10px",
+              borderRadius: 12,
+              backgroundColor:
+                liveData.status === "connected" ? "#d1fae5" : "#fee2e2",
+              color: liveData.status === "connected" ? "#065f46" : "#991b1b",
+            }}
+          >
+            {liveData.status === "connected"
+              ? `🟢 Live — Last synced: ${liveData.lastSynced}`
+              : "🔴 Disconnected — reconnecting in a few seconds…"}
+          </span>
+          {liveData.status !== "connected" && (
+            <button
+              type="button"
+              onClick={() => setConnectKey((k) => k + 1)}
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                padding: "4px 10px",
+                borderRadius: 8,
+                border: "1px solid #dc2626",
+                backgroundColor: "#fff",
+                color: "#991b1b",
+                cursor: "pointer",
+              }}
+            >
+              Reconnect now
+            </button>
+          )}
+        </div>
       </div>
 
       <div

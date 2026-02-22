@@ -44,38 +44,69 @@ const categoryConfig = {
   mindfulness: { icon: Brain, color: "#7c3aed", label: "Mind & Rest" },
 };
 
+const COACHING_TIMEOUT_MS = 20000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("Request timed out")), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
 export default function WellnessView() {
   const [tasks, setTasks] = useState<Task[]>(routineTasks);
   const [loading, setLoading] = useState(true);
   const [aiEncouragement, setAiEncouragement] = useState<string>("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCoachingPlan = async () => {
+      setLoadError(null);
       try {
         setLoading(true);
-        const data = await getCoaching(getStoredProfile());
+        const data = await withTimeout(
+          getCoaching(getStoredProfile()),
+          COACHING_TIMEOUT_MS,
+        );
 
-        if (data.status === "success" && data.data) {
-          const aiPlan = data.data.coaching_plan || [];
+        if (data?.status === "success" && data?.data) {
+          const aiPlan = Array.isArray(data.data.coaching_plan)
+            ? data.data.coaching_plan
+            : [];
           const encouragement =
             data.data.encouragement || "Stay consistent, you're doing great.";
           setAiEncouragement(encouragement);
 
-          // Map LLM response to our Task interface
-          const newAiTasks: Task[] = aiPlan.map((item: any, idx: number) => ({
+          const newAiTasks: Task[] = aiPlan.map((item: { action?: string; timeframe?: string; category?: string; reasoning?: string }, idx: number) => ({
             id: `ai-${idx}`,
-            label: item.action,
+            label: item.action || "Follow your plan",
             time: item.timeframe,
-            category: mapCategory(item.category),
+            category: mapCategory(item.category || "general"),
             done: false,
             reasoning: item.reasoning,
           }));
 
-          // Merge routine meds with the new dynamic AI plan
           setTasks([...routineTasks, ...newAiTasks]);
+        } else {
+          setAiEncouragement("Stay consistent, you're doing great.");
         }
       } catch (err) {
         console.error("Failed to fetch AI plan", err);
+        setLoadError(
+          err instanceof Error && err.message === "Request timed out"
+            ? "Plan is taking longer than usual. Showing your routine."
+            : "Couldn't load personalized plan. Showing your routine.",
+        );
+        setAiEncouragement("Stay consistent, you're doing great.");
       } finally {
         setLoading(false);
       }
@@ -225,6 +256,26 @@ export default function WellnessView() {
             style={{ marginRight: 10 }}
           />
           <span>Generating your personalized plan...</span>
+        </div>
+      )}
+
+      {/* Error / fallback message when plan failed to load */}
+      {!loading && loadError && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "12px 16px",
+            marginBottom: 20,
+            backgroundColor: "#fffbeb",
+            border: "1px solid #fde68a",
+            borderRadius: 12,
+            color: "#92400e",
+            fontSize: 13,
+          }}
+        >
+          <span>{loadError}</span>
         </div>
       )}
 

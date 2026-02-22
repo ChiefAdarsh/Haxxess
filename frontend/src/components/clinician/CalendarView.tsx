@@ -1,16 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ChevronLeft,
   ChevronRight,
   Calendar as CalendarIcon,
 } from "lucide-react";
+import { getAppointments } from "../../api/client";
 import { patients } from "../../config/patients";
-
-const urgencyColor = {
-  critical: "#be185d",
-  moderate: "#f59e0b",
-  stable: "#10b981",
-};
+import type { Patient } from "../../config/patients";
 
 const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const monthNames = [
@@ -28,36 +24,7 @@ const monthNames = [
   "December",
 ];
 
-const appointments: Record<
-  string,
-  { time: string; patient: (typeof patients)[0]; type: string }[]
-> = {
-  "2026-02-22": [
-    { time: "9:00 AM", patient: patients[3], type: "Post-Op Follow-up" },
-  ],
-  "2026-02-24": [
-    { time: "10:30 AM", patient: patients[0], type: "Endometriosis Check" },
-    { time: "2:00 PM", patient: patients[2], type: "Prenatal" },
-  ],
-  "2026-02-25": [
-    { time: "11:00 AM", patient: patients[4], type: "Annual Physical" },
-  ],
-  "2026-02-26": [
-    { time: "9:30 AM", patient: patients[5], type: "BP Follow-up" },
-  ],
-  "2026-02-28": [
-    { time: "1:00 PM", patient: patients[1], type: "Pelvic Pain Consult" },
-  ],
-  "2026-03-01": [{ time: "10:00 AM", patient: patients[2], type: "Prenatal" }],
-  "2026-03-03": [
-    { time: "2:00 PM", patient: patients[0], type: "Vitality Data Review" },
-  ],
-  "2026-03-05": [
-    { time: "9:00 AM", patient: patients[3], type: "HRV Consult" },
-  ],
-  "2026-03-10": [{ time: "11:00 AM", patient: patients[4], type: "Physical" }],
-  "2026-03-12": [{ time: "3:00 PM", patient: patients[5], type: "BP Check" }],
-};
+type AppointmentItem = { time: string; patient_name: string; type: string };
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -71,14 +38,64 @@ function formatDateKey(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-export default function CalendarView() {
-  const [year, setYear] = useState(2026);
-  const [month, setMonth] = useState(1); // feb = 1
+function patientForAppointment(patient_name: string): Patient {
+  const found = patients.find(
+    (p) => p.name.toLowerCase() === patient_name.toLowerCase(),
+  );
+  if (found) return found;
+  return {
+    id: `calendar-${patient_name.replace(/\s+/g, "-").toLowerCase()}`,
+    name: patient_name,
+    age: 0,
+    urgency: "stable",
+    condition: "—",
+    lastVisit: "—",
+    nextAppointment: "—",
+    phone: "—",
+  };
+}
+
+interface CalendarViewProps {
+  onSelectPatient: (patient: Patient) => void;
+}
+
+export default function CalendarView({ onSelectPatient }: CalendarViewProps) {
+  const today = new Date();
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
+  const [appointmentsByDate, setAppointmentsByDate] = useState<Record<string, AppointmentItem[]>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const from = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+    const daysInMonth = getDaysInMonth(year, month);
+    const to = `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
+    getAppointments(from, to)
+      .then((res) => {
+        if (cancelled || !res?.appointments) return;
+        const byDate: Record<string, AppointmentItem[]> = {};
+        for (const a of res.appointments) {
+          const d = a.date;
+          if (!byDate[d]) byDate[d] = [];
+          byDate[d].push({
+            time: a.time,
+            patient_name: a.patient_name,
+            type: a.type,
+          });
+        }
+        setAppointmentsByDate(byDate);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [year, month]);
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
 
-  const today = new Date("2026-02-22T18:00:00");
   const isToday = (d: number) =>
     today.getFullYear() === year &&
     today.getMonth() === month &&
@@ -246,7 +263,7 @@ export default function CalendarView() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
           {cells.map((day, i) => {
             const key = day ? formatDateKey(year, month, day) : "";
-            const appts = day ? appointments[key] || [] : [];
+            const appts = day ? appointmentsByDate[key] || [] : [];
             const isCurrentDay = day && isToday(day);
 
             return (
@@ -302,62 +319,76 @@ export default function CalendarView() {
                       }}
                     >
                       {appts.map((a, j) => {
-                        const isCritical = a.patient.urgency === "critical";
+                        const patient = patientForAppointment(a.patient_name);
                         return (
-                          <div
-                            key={j}
+                        <button
+                          key={j}
+                          type="button"
+                          onClick={() => onSelectPatient(patient)}
+                          style={{
+                            padding: "6px 8px",
+                            borderRadius: 8,
+                            backgroundColor: "#fdf2f8",
+                            border: "1px solid #fbcfe8",
+                            borderLeft: "3px solid #be185d",
+                            cursor: "pointer",
+                            transition: "transform 0.15s",
+                            width: "100%",
+                            textAlign: "left",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = "scale(1.02)";
+                            e.currentTarget.style.backgroundColor = "#fce7f3";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = "scale(1)";
+                            e.currentTarget.style.backgroundColor = "#fdf2f8";
+                          }}
+                        >
+                          <p
                             style={{
-                              padding: "6px 8px",
-                              borderRadius: 8,
-                              backgroundColor: isCritical
-                                ? "#fdf2f8"
-                                : `${urgencyColor[a.patient.urgency]}10`,
-                              border: `1px solid ${isCritical ? "#fbcfe8" : "transparent"}`,
-                              borderLeft: `3px solid ${urgencyColor[a.patient.urgency]}`,
-                              cursor: "pointer",
-                              transition: "transform 0.15s",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#be185d",
+                              margin: 0,
+                              letterSpacing: "0.02em",
                             }}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.transform = "scale(1.02)")
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.transform = "scale(1)")
-                            }
                           >
-                            <p
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: urgencyColor[a.patient.urgency],
-                                margin: 0,
-                                letterSpacing: "0.02em",
-                              }}
-                            >
-                              {a.time}
-                            </p>
-                            <p
-                              style={{
-                                fontSize: 12,
-                                color: "#1e293b",
-                                margin: "2px 0 0",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {a.patient.name}
-                            </p>
-                            <p
-                              style={{
-                                fontSize: 11,
-                                color: "#64748b",
-                                margin: "2px 0 0",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                              }}
-                            >
-                              {a.type}
-                            </p>
-                          </div>
+                            {a.time}
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 12,
+                              color: "#1e293b",
+                              margin: "2px 0 0",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {a.patient_name}
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 11,
+                              color: "#64748b",
+                              margin: "2px 0 0",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {a.type}
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 10,
+                              color: "#be185d",
+                              margin: "4px 0 0",
+                              fontWeight: 600,
+                            }}
+                          >
+                            View profile →
+                          </p>
+                        </button>
                         );
                       })}
                     </div>
@@ -368,6 +399,11 @@ export default function CalendarView() {
           })}
         </div>
       </div>
+      {loading && (
+        <p style={{ fontSize: 13, color: "#64748b", marginTop: 12 }}>
+          Loading appointments...
+        </p>
+      )}
     </div>
   );
 }

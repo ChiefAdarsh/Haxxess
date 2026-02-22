@@ -8,8 +8,19 @@ import {
   BrainCircuit,
   Activity,
   AlertTriangle,
+  Heart,
+  Thermometer,
+  Droplets,
+  TrendingUp,
 } from "lucide-react";
-import { getConsolidated, getForecast, getSmartAlert, getSymptoms } from "../../api/client";
+import {
+  getConsolidated,
+  getForecast,
+  getSmartAlert,
+  getSymptoms,
+  getStatus,
+  getHistoryTrends,
+} from "../../api/client";
 import type { Patient } from "../../config/patients";
 
 const urgencyColor = {
@@ -25,25 +36,32 @@ interface PatientDetailProps {
 
 export default function PatientDetail({ patient, onBack }: PatientDetailProps) {
   const [liveData, setLiveData] = useState<any>(null);
+  const [statusData, setStatusData] = useState<any>(null);
   const [forecastData, setForecastData] = useState<any>(null);
   const [alertData, setAlertData] = useState<any>(null);
   const [symptoms, setSymptoms] = useState<any[]>([]);
+  const [historyTrends, setHistoryTrends] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [vitRes, foreRes, alertRes, symptomsRes] = await Promise.all([
-          getConsolidated(),
-          getForecast(),
-          getSmartAlert(),
-          getSymptoms(14).catch(() => ({ symptoms: [] })),
-        ]);
+        const [vitRes, statusRes, foreRes, alertRes, symptomsRes, trendsRes] =
+          await Promise.all([
+            getConsolidated(),
+            getStatus().catch(() => null),
+            getForecast(),
+            getSmartAlert(),
+            getSymptoms(30).catch(() => ({ symptoms: [] })),
+            getHistoryTrends(undefined, 14).catch(() => null),
+          ]);
         if (vitRes) setLiveData(vitRes);
+        if (statusRes) setStatusData(statusRes);
         if (foreRes?.data) setForecastData(foreRes.data);
         if (alertRes?.data) setAlertData(alertRes.data);
         if (Array.isArray(symptomsRes?.symptoms)) setSymptoms(symptomsRes.symptoms);
+        if (trendsRes?.trends) setHistoryTrends(trendsRes.trends);
       } catch {
       } finally {
         setLoading(false);
@@ -140,6 +158,94 @@ export default function PatientDetail({ patient, onBack }: PatientDetailProps) {
           <Calendar size={16} className="text-emerald-600" /> Schedule Visit
         </button>
       </div>
+
+      {/* How they're doing: cycle state + summary + trend */}
+      {!loading && (liveData?.summary || statusData?.cycle_state || statusData?.trend_context) && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-5 shadow-sm">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            How they&apos;re doing
+          </h3>
+          <div className="flex flex-wrap gap-4 items-start">
+            {statusData?.cycle_state && (
+              <span className="text-sm font-semibold text-pink-700 bg-pink-50 px-3 py-1.5 rounded-lg">
+                Cycle state: {statusData.cycle_state.replace(/_/g, " ")}
+              </span>
+            )}
+            {statusData?.trend_context?.trajectory && (
+              <span className="text-sm text-slate-600 flex items-center gap-1.5">
+                <TrendingUp size={14} />
+                Trend: {statusData.trend_context.trajectory}
+                {statusData.trend_context.delta_7d != null && (
+                  <span className="text-slate-500">
+                    ({statusData.trend_context.delta_7d > 0 ? "+" : ""}
+                    {statusData.trend_context.delta_7d?.toFixed(1)}/day)
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+          {liveData?.summary && (
+            <p className="text-sm text-slate-700 mt-3 leading-relaxed">
+              {liveData.summary}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Live Vitals (same as patient Vitals tab) */}
+      {!loading && statusData?.wearable && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-5 shadow-sm">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+            Live vitals
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {(() => {
+              const aw = statusData.wearable?.apple_watch || {};
+              const bp = aw.blood_pressure || {};
+              const hr = aw.heart_rate_bpm ?? "—";
+              const sys = bp.systolic_mmhg ?? "—";
+              const dia = bp.diastolic_mmhg ?? "—";
+              const dex = statusData.wearable?.dexcom_g7 || {};
+              const glucose = dex.glucose_mg_dl ?? "—";
+              const oura = statusData.wearable?.oura_ring || {};
+              const tempDelta = oura.skin_temperature_delta_c ?? 0;
+              const temp = typeof tempDelta === "number" ? (36.5 + tempDelta).toFixed(1) : "—";
+              return (
+                <>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-red-50 border border-red-100">
+                    <Heart size={20} className="text-red-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-red-600 uppercase">Heart rate</p>
+                      <p className="text-lg font-bold text-slate-800">{hr} bpm</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 border border-amber-100">
+                    <Activity size={20} className="text-amber-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-amber-600 uppercase">Blood pressure</p>
+                      <p className="text-lg font-bold text-slate-800">{sys}/{dia}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 border border-blue-100">
+                    <Droplets size={20} className="text-blue-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-blue-600 uppercase">Glucose</p>
+                      <p className="text-lg font-bold text-slate-800">{glucose} mg/dL</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-pink-50 border border-pink-100">
+                    <Thermometer size={20} className="text-pink-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-pink-600 uppercase">Temp (est.)</p>
+                      <p className="text-lg font-bold text-slate-800">{temp} °C</p>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-5">
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
@@ -263,6 +369,37 @@ export default function PatientDetail({ patient, onBack }: PatientDetailProps) {
             )}
           </div>
 
+          {/* Vitality trend (last 14 days) – same as patient home */}
+          {!loading && historyTrends && typeof historyTrends === "object" && Object.keys(historyTrends).length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <TrendingUp size={14} /> Vitality trend (14d)
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {historyTrends.vitality_index?.description && (
+                  <span className="px-3 py-1.5 rounded-lg bg-pink-50 border border-pink-100 text-sm font-semibold text-pink-700">
+                    Index: {historyTrends.vitality_index.description}
+                  </span>
+                )}
+                {historyTrends.heart_rate?.description && (
+                  <span className="px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-700">
+                    HR: {historyTrends.heart_rate.description}
+                  </span>
+                )}
+                {historyTrends.hrv?.description && (
+                  <span className="px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-700">
+                    HRV: {historyTrends.hrv.description}
+                  </span>
+                )}
+                {historyTrends.glucose?.description && (
+                  <span className="px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-700">
+                    Glucose: {historyTrends.glucose.description}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {alertData && (alertData.title || alertData.message || alertData.summary) && (
             <div
               className={`rounded-2xl border p-5 flex items-start gap-3 ${
@@ -293,28 +430,56 @@ export default function PatientDetail({ patient, onBack }: PatientDetailProps) {
             </div>
           )}
 
-          {symptoms.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
-                Recent body-map symptoms (pipeline)
-              </h3>
-              <div className="flex flex-col gap-2">
-                {symptoms.slice(0, 5).map((s: any) => (
-                  <div
-                    key={s.id || s.timestamp}
-                    className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0"
-                  >
-                    <span className="text-sm text-slate-700">
-                      {s.region} · {s.type} (severity {s.severity}/10)
-                    </span>
-                    <span className="text-xs text-slate-400">
-                      {s.timestamp ? new Date(s.timestamp).toLocaleDateString() : ""}
-                    </span>
-                  </div>
-                ))}
+          {/* Body map symptoms – full list */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+              Body map symptoms (pipeline)
+            </h3>
+            {loading ? (
+              <p className="text-sm text-slate-400 py-2">Loading...</p>
+            ) : symptoms.length === 0 ? (
+              <p className="text-sm text-slate-500 py-2">No symptoms logged in the last 30 days.</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {symptoms.map((s: { id?: string; timestamp?: string; region?: string; type?: string; severity?: number; qualities?: string[]; notes?: string }) => {
+                  const sev = s.severity ?? 0;
+                  const sevColor = sev >= 7 ? "#dc2626" : sev >= 4 ? "#f59e0b" : "#10b981";
+                  return (
+                    <div
+                      key={s.id || s.timestamp || Math.random()}
+                      className="flex flex-wrap items-start justify-between gap-2 py-3 px-4 rounded-xl border border-slate-100 hover:border-slate-200"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-slate-800 capitalize">
+                            {String(s.region || "").replace(/_/g, " ")}
+                          </span>
+                          <span className="text-xs font-medium text-slate-500">{s.type}</span>
+                          <span
+                            className="text-xs font-bold px-2 py-0.5 rounded"
+                            style={{ backgroundColor: `${sevColor}20`, color: sevColor }}
+                          >
+                            {sev}/10
+                          </span>
+                        </div>
+                        {Array.isArray(s.qualities) && s.qualities.length > 0 && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            {s.qualities.join(", ")}
+                          </p>
+                        )}
+                        {s.notes && (
+                          <p className="text-xs text-slate-600 mt-1 italic">&quot;{s.notes}&quot;</p>
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-400 shrink-0">
+                        {s.timestamp ? new Date(s.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : ""}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
