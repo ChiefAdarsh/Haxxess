@@ -15,7 +15,14 @@ from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from services.acoustics import analyze_audio, AcousticAnalysisResult
-from services.wearable import MockOuraRing, MockAppleWatch, MockDexcomG7, collect_snapshot
+from services.wearable import (
+    MockOuraRing,
+    MockAppleWatch,
+    MockDexcomG7,
+    collect_snapshot,
+    PROFILES as WEARABLE_PROFILES,
+    set_profiles_source,
+)
 from services.consolidate import consolidate
 from services.intelligence import (
     generate_predictive_risk_model,
@@ -33,6 +40,7 @@ from services.history import (
     compute_all_trends,
 )
 from services.symptom_extract import extract_symptoms
+from services import db as db_service
 
 _env_dir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv()
@@ -89,10 +97,48 @@ class AppointmentCreate(BaseModel):
     patient_name: Optional[str] = None  # display name; can be set by frontend
 
 
-# In-memory stores (hackathon-safe). In production, replace with DB keyed by patient_id.
+# In-memory fallback when MONGODB_URI is not set
 _cycle_periods: List[PeriodEvent] = []
 _symptom_logs: List[Dict[str, Any]] = []
 _appointments: List[Dict[str, Any]] = []
+
+
+def _period_dict_to_model(d: Dict[str, Any]) -> PeriodEvent:
+    return PeriodEvent(
+        startDate=d["startDate"],
+        endDate=d.get("endDate"),
+        flow=d.get("flow"),
+        notes=d.get("notes"),
+    )
+
+
+async def _get_cycle_periods_list() -> List[PeriodEvent]:
+    if db_service.MONGODB_URI:
+        rows = await db_service.db_get_cycle_periods()
+        return [_period_dict_to_model({k: v for k, v in r.items() if k != "_id"}) for r in rows]
+    return _cycle_periods
+
+
+async def _get_symptom_logs(days: int = 30) -> List[Dict[str, Any]]:
+    if db_service.MONGODB_URI:
+        cutoff = (datetime.utcnow() - timedelta(days=max(1, min(days, 365)))).isoformat() + "Z"
+        return await db_service.db_get_symptoms(cutoff)
+    return _symptom_logs
+
+
+async def _get_appointments_list(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    if db_service.MONGODB_URI:
+        return await db_service.db_get_appointments(from_date, to_date)
+    out = list(_appointments)
+    if from_date:
+        out = [a for a in out if (a.get("date") or "") >= from_date]
+    if to_date:
+        out = [a for a in out if (a.get("date") or "") <= to_date]
+    out.sort(key=lambda a: (a.get("date", ""), a.get("time", "")))
+    return out
 
 
 print("     Loading AI models...")
@@ -128,22 +174,75 @@ _oura_ring = MockOuraRing(profile=_wearable_profile)
 _dexcom = MockDexcomG7(profile=_wearable_profile)
 
 
+def _seed_sample_data():
+    """Sample data to push to MongoDB when collections are empty (no more in-code mock data)."""
+    now = datetime.utcnow()
+    base_ts = (now - timedelta(days=30)).isoformat() + "Z"
+    return {
+        "sample_periods": [
+            {"startDate": "2025-01-06", "endDate": "2025-01-10", "flow": "medium", "notes": ""},
+            {"startDate": "2025-02-03", "endDate": "2025-02-07", "flow": "medium", "notes": ""},
+            {"startDate": "2025-02-20", "endDate": "2025-02-24", "flow": "light", "notes": ""},
+        ],
+        "sample_symptoms": [
+            {"id": "s_seed_1", "timestamp": base_ts, "region": "pelvic_midline", "type": "cramping", "severity": 4, "qualities": [], "timing": "", "triggers": [], "notes": ""},
+            {"id": "s_seed_2", "timestamp": (now - timedelta(days=14)).isoformat() + "Z", "region": "lower_back", "type": "pain", "severity": 3, "qualities": [], "timing": "", "triggers": [], "notes": ""},
+            {"id": "s_seed_3", "timestamp": (now - timedelta(days=7)).isoformat() + "Z", "region": "head", "type": "headache", "severity": 5, "qualities": [], "timing": "", "triggers": [], "notes": ""},
+            {"id": "s_seed_4", "timestamp": (now - timedelta(days=3)).isoformat() + "Z", "region": "pelvic_midline", "type": "bloating", "severity": 3, "qualities": [], "timing": "", "triggers": [], "notes": ""},
+            {"id": "s_seed_5", "timestamp": (now - timedelta(days=1)).isoformat() + "Z", "region": "chest", "type": "tenderness", "severity": 4, "qualities": [], "timing": "", "triggers": [], "notes": ""},
+        ],
+        "sample_appointments": [
+            {"id": "apt_seed_1", "date": (now + timedelta(days=7)).strftime("%Y-%m-%d"), "time": "10:00", "type": "Visit", "patient_name": "Patient"},
+            {"id": "apt_seed_2", "date": (now + timedelta(days=14)).strftime("%Y-%m-%d"), "time": "14:00", "type": "Follow-up", "patient_name": "Patient"},
+            {"id": "apt_seed_3", "date": (now + timedelta(days=21)).strftime("%Y-%m-%d"), "time": "09:00", "type": "Visit", "patient_name": "Patient"},
+        ],
+    }
+
+
+@app.on_event("startup")
+async def startup_load_profile():
+    global _wearable_profile, _apple_watch, _oura_ring, _dexcom, VALID_PROFILES
+    if db_service.MONGODB_URI:
+        try:
+            seed_data = _seed_sample_data()
+            await db_service.db_seed_initial(
+                WEARABLE_PROFILES,
+                sample_periods=seed_data["sample_periods"],
+                sample_symptoms=seed_data["sample_symptoms"],
+                sample_appointments=seed_data["sample_appointments"],
+            )
+            _wearable_profile = await db_service.db_get_wearable_profile()
+            all_profiles = await db_service.db_get_all_profiles()
+            if all_profiles:
+                set_profiles_source(all_profiles)
+                VALID_PROFILES.clear()
+                VALID_PROFILES.update(all_profiles.keys())
+            _apple_watch = MockAppleWatch(profile=_wearable_profile)
+            _oura_ring = MockOuraRing(profile=_wearable_profile)
+            _dexcom = MockDexcomG7(profile=_wearable_profile)
+            print(f"     MongoDB: seeded data; profile '{_wearable_profile}'; {len(all_profiles)} profiles from DB")
+        except Exception as e:
+            print(f"     MongoDB startup warning: {e}")
+
+
 def _resolve_profile(profile: Optional[str]) -> str:
     return profile if profile and profile in VALID_PROFILES else _wearable_profile
 
 
-def _ensure_consolidated(profile: Optional[str] = None) -> Any:
-    """Rebuild consolidated result if needed."""
+async def _ensure_consolidated(profile: Optional[str] = None) -> Any:
+    """Rebuild consolidated result if needed (uses DB when MONGODB_URI set)."""
     global _latest_consolidated
     prof = _resolve_profile(profile)
     if profile or not _latest_consolidated:
         snapshot = collect_snapshot(profile=prof)
+        periods = await _get_cycle_periods_list()
+        symptom_logs = await _get_symptom_logs(30)
         _latest_consolidated = consolidate(
             acoustic_result=_latest_acoustic,
             wearable_snapshot=snapshot,
             profile=prof,
-            symptom_logs=_symptom_logs,
-            cycle_periods_context=_cycle_periods_context(_cycle_periods),
+            symptom_logs=symptom_logs,
+            cycle_periods_context=_cycle_periods_context(periods),
         )
     return _latest_consolidated
 
@@ -337,13 +436,14 @@ async def get_consolidated(
     try:
         prof = _resolve_profile(profile)
         snapshot = collect_snapshot(profile=prof)
-
+        periods = await _get_cycle_periods_list()
+        symptom_logs = await _get_symptom_logs(30)
         result = consolidate(
             acoustic_result=_latest_acoustic,
             wearable_snapshot=snapshot,
             profile=prof,
-            symptom_logs=_symptom_logs,
-            cycle_periods_context=_cycle_periods_context(_cycle_periods),
+            symptom_logs=symptom_logs,
+            cycle_periods_context=_cycle_periods_context(periods),
         )
         _latest_consolidated = result
 
@@ -393,13 +493,14 @@ async def post_consolidated(
 
         prof = _resolve_profile(profile)
         snapshot = collect_snapshot(profile=prof)
-
+        periods = await _get_cycle_periods_list()
+        symptom_logs = await _get_symptom_logs(30)
         result = consolidate(
             acoustic_result=_latest_acoustic,
             wearable_snapshot=snapshot,
             profile=prof,
-            symptom_logs=_symptom_logs,
-            cycle_periods_context=_cycle_periods_context(_cycle_periods),
+            symptom_logs=symptom_logs,
+            cycle_periods_context=_cycle_periods_context(periods),
         )
         _latest_consolidated = result
 
@@ -433,13 +534,14 @@ async def post_consolidated(
 async def get_status():
     prof = _wearable_profile
     snapshot = collect_snapshot(profile=prof)
-
+    periods = await _get_cycle_periods_list()
+    symptom_logs = await _get_symptom_logs(30)
     result = consolidate(
         acoustic_result=_latest_acoustic,
         wearable_snapshot=snapshot,
         profile=prof,
-        symptom_logs=_symptom_logs,
-        cycle_periods_context=_cycle_periods_context(_cycle_periods),
+        symptom_logs=symptom_logs,
+        cycle_periods_context=_cycle_periods_context(periods),
     )
 
     return {
@@ -470,7 +572,8 @@ async def get_status():
 
 @app.get("/cycle/periods")
 async def get_cycle_periods():
-    periods_sorted = sorted(_cycle_periods, key=lambda p: p.startDate)
+    periods = await _get_cycle_periods_list()
+    periods_sorted = sorted(periods, key=lambda p: p.startDate)
     stats = _cycle_stats(periods_sorted)
     preds = _cycle_predictions(periods_sorted)
 
@@ -484,21 +587,24 @@ async def get_cycle_periods():
 
 @app.post("/cycle/periods")
 async def add_cycle_period(req: AddPeriodRequest):
-    global _cycle_periods
-    if any(p.startDate == req.startDate for p in _cycle_periods):
-        _cycle_periods = [p for p in _cycle_periods if p.startDate != req.startDate]
-
-    _cycle_periods.append(PeriodEvent(
-        startDate=req.startDate,
-        endDate=req.endDate,
-        flow=req.flow,
-        notes=req.notes,
-    ))
-
-    periods_sorted = sorted(_cycle_periods, key=lambda p: p.startDate)
+    if db_service.MONGODB_URI:
+        await db_service.db_upsert_cycle_period(
+            req.startDate, req.endDate, req.flow, req.notes
+        )
+    else:
+        global _cycle_periods
+        if any(p.startDate == req.startDate for p in _cycle_periods):
+            _cycle_periods = [p for p in _cycle_periods if p.startDate != req.startDate]
+        _cycle_periods.append(PeriodEvent(
+            startDate=req.startDate,
+            endDate=req.endDate,
+            flow=req.flow,
+            notes=req.notes,
+        ))
+    periods = await _get_cycle_periods_list()
+    periods_sorted = sorted(periods, key=lambda p: p.startDate)
     stats = _cycle_stats(periods_sorted)
     preds = _cycle_predictions(periods_sorted)
-
     return {
         "status": "success",
         "periods": [p.dict() for p in periods_sorted],
@@ -510,15 +616,13 @@ async def add_cycle_period(req: AddPeriodRequest):
 @app.get("/symptoms")
 async def get_symptoms(days: int = 30):
     """Return recent body-map symptom logs for pipeline and display."""
-    cutoff = (datetime.utcnow() - timedelta(days=max(1, min(days, 365)))).isoformat() + "Z"
-    recent = [s for s in _symptom_logs if (s.get("timestamp") or "") >= cutoff]
+    recent = await _get_symptom_logs(max(1, min(days, 365)))
     return {"status": "success", "symptoms": recent, "count": len(recent)}
 
 
 @app.post("/symptoms")
 async def add_symptom(entry: SymptomEntryPayload):
     """Append one body-map symptom log (from Body Map / SymptomContext)."""
-    global _symptom_logs
     rec = {
         "id": f"s{datetime.utcnow().timestamp():.0f}",
         "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -530,16 +634,22 @@ async def add_symptom(entry: SymptomEntryPayload):
         "triggers": entry.triggers,
         "notes": entry.notes,
     }
-    _symptom_logs.append(rec)
+    if db_service.MONGODB_URI:
+        await db_service.db_add_symptom(rec)
+        # PyMongo mutates rec and adds _id: ObjectId; make JSON-serializable
+        return {"status": "success", "symptom": db_service._to_json_safe(rec)}
+    else:
+        global _symptom_logs
+        _symptom_logs.append(rec)
     return {"status": "success", "symptom": rec}
 
 
 @app.post("/symptoms/bulk")
 async def add_symptoms_bulk(entries: List[SymptomEntryPayload]):
     """Sync multiple symptom entries (e.g. on app load)."""
-    global _symptom_logs
+    recs = []
     for entry in entries:
-        rec = {
+        recs.append({
             "id": f"s{datetime.utcnow().timestamp():.0f}",
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "region": entry.region,
@@ -549,8 +659,12 @@ async def add_symptoms_bulk(entries: List[SymptomEntryPayload]):
             "timing": entry.timing,
             "triggers": entry.triggers,
             "notes": entry.notes,
-        }
-        _symptom_logs.append(rec)
+        })
+    if db_service.MONGODB_URI:
+        await db_service.db_add_symptoms_bulk(recs)
+    else:
+        global _symptom_logs
+        _symptom_logs.extend(recs)
     return {"status": "success", "count": len(entries)}
 
 
@@ -560,19 +674,13 @@ async def get_appointments(
     to_date: Optional[str] = Query(None),
 ):
     """Return scheduled appointments. Optional from_date/to_date (YYYY-MM-DD) to filter."""
-    out = list(_appointments)
-    if from_date:
-        out = [a for a in out if (a.get("date") or "") >= from_date]
-    if to_date:
-        out = [a for a in out if (a.get("date") or "") <= to_date]
-    out.sort(key=lambda a: (a.get("date", ""), a.get("time", "")))
+    out = await _get_appointments_list(from_date, to_date)
     return {"status": "success", "appointments": out}
 
 
 @app.post("/calendar/appointments")
 async def create_appointment(body: AppointmentCreate):
     """Patient schedules an appointment; shows on clinician calendar."""
-    global _appointments
     rec = {
         "id": f"apt_{datetime.utcnow().timestamp():.0f}",
         "date": body.date,
@@ -580,8 +688,21 @@ async def create_appointment(body: AppointmentCreate):
         "type": body.type or "Visit",
         "patient_name": body.patient_name or "Patient",
     }
-    _appointments.append(rec)
+    if db_service.MONGODB_URI:
+        await db_service.db_add_appointment(rec)
+    else:
+        global _appointments
+        _appointments.append(rec)
     return {"status": "success", "appointment": rec}
+
+
+@app.get("/settings/profiles")
+async def get_profiles():
+    """Return list of cycle/profile ids and labels (from DB when connected, else built-in)."""
+    if db_service.MONGODB_URI:
+        all_p = await db_service.db_get_all_profiles()
+        return {"profiles": [{"id": pid, "label": (p.get("label") or pid.replace("_", " ").title())} for pid, p in all_p.items()]}
+    return {"profiles": [{"id": pid, "label": WEARABLE_PROFILES.get(pid, {}).get("label", pid.replace("_", " ").title())} for pid in sorted(VALID_PROFILES)]}
 
 
 @app.put("/settings/wearable-profile")
@@ -594,6 +715,8 @@ async def set_wearable_profile(profile: str = Query(...)):
             detail=f"Invalid profile. Choose from: {sorted(VALID_PROFILES)}",
         )
 
+    if db_service.MONGODB_URI:
+        await db_service.db_set_wearable_profile(profile)
     _wearable_profile = profile
     _apple_watch = MockAppleWatch(profile=profile)
     _oura_ring = MockOuraRing(profile=profile)
@@ -626,7 +749,7 @@ async def wearable_stream(websocket: WebSocket):
 @app.get("/intelligence/forecast")
 async def get_forecast(profile: Optional[str] = Query(default=None)):
     try:
-        result = _ensure_consolidated(profile)
+        result = await _ensure_consolidated(profile)
         return {"status": "success", "data": generate_predictive_risk_model(result)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -635,7 +758,7 @@ async def get_forecast(profile: Optional[str] = Query(default=None)):
 @app.get("/intelligence/coaching")
 async def get_coaching_plan(profile: Optional[str] = Query(default=None)):
     try:
-        result = _ensure_consolidated(profile)
+        result = await _ensure_consolidated(profile)
         return {"status": "success", "data": generate_lifestyle_coaching(result)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -644,7 +767,7 @@ async def get_coaching_plan(profile: Optional[str] = Query(default=None)):
 @app.post("/intelligence/chat")
 async def chat_with_assistant(req: ChatRequest, profile: Optional[str] = Query(default=None)):
     try:
-        result = _ensure_consolidated(profile)
+        result = await _ensure_consolidated(profile)
         reply = handle_virtual_assistant(
             user_message=req.message,
             vitality_result=result,
@@ -659,7 +782,7 @@ async def chat_with_assistant(req: ChatRequest, profile: Optional[str] = Query(d
 @app.get("/intelligence/alert")
 async def get_smart_alert(profile: Optional[str] = Query(default=None)):
     try:
-        result = _ensure_consolidated(profile)
+        result = await _ensure_consolidated(profile)
         return {"status": "success", "data": generate_smart_alert(result)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

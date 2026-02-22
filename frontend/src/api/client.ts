@@ -83,6 +83,11 @@ export function addCyclePeriod(data: {
   });
 }
 
+// list of cycle/profile options (from DB when backend uses MongoDB)
+export function getProfiles() {
+  return request<{ profiles: { id: string; label: string }[] }>("/settings/profiles");
+}
+
 // set wearable profile
 export function setWearableProfile(profile: string) {
   return request<any>(`/settings/wearable-profile?profile=${profile}`, {

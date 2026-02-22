@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { setWearableProfile } from "../api/client";
+import { setWearableProfile, getProfiles } from "../api/client";
 
 const LS_KEY = "vitality_wearable_profile";
 
-const PROFILES: { id: string; label: string }[] = [
+const FALLBACK_PROFILES: { id: string; label: string }[] = [
   { id: "follicular", label: "Follicular" },
   { id: "ovulation", label: "Ovulation" },
   { id: "luteal_mild", label: "Early Luteal" },
@@ -22,7 +22,14 @@ export default function ProfileSelector() {
       return "follicular";
     }
   });
+  const [profiles, setProfiles] = useState<{ id: string; label: string }[]>(FALLBACK_PROFILES);
   const [updating, setUpdating] = useState(false);
+
+  useEffect(() => {
+    getProfiles()
+      .then((r) => r.profiles?.length && setProfiles(r.profiles))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     try {
@@ -66,7 +73,7 @@ export default function ProfileSelector() {
           border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-pink-500/30 focus:border-pink-400
         `}
       >
-        {PROFILES.map((p) => (
+        {profiles.map((p) => (
           <option key={p.id} value={p.id}>
             {p.label}
           </option>

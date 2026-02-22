@@ -90,9 +90,20 @@ PROFILES = {
     },
 }
 
+# When MongoDB is used, main seeds and loads profiles into this; wearable then uses DB data.
+PROFILES_SOURCE: Optional[dict] = None
+
+
+def set_profiles_source(profiles_dict: Optional[dict]) -> None:
+    """Set profile definitions from DB (id -> { label, hr, hrv, ... }). None = use built-in PROFILES."""
+    global PROFILES_SOURCE
+    PROFILES_SOURCE = profiles_dict
+
 
 def _get_profile(name: str) -> dict:
-    return PROFILES.get(name, PROFILES["baseline"]).copy()
+    source = PROFILES_SOURCE if PROFILES_SOURCE is not None else PROFILES
+    base = PROFILES.get("baseline", {})
+    return source.get(name, source.get("baseline", base)).copy()
 
 
 def _clamp(val, lo, hi):
