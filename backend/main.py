@@ -1,7 +1,7 @@
 import os
 import tempfile
-from datetime import datetime
-from typing import Optional, Any
+from datetime import datetime, timedelta
+from typing import Optional, Any, List, Dict
 from dotenv import load_dotenv
 
 import librosa
@@ -46,8 +46,29 @@ VALID_PROFILES = {
     "baseline",
 }
 
+
 class ChatRequest(BaseModel):
     message: str
+
+
+# --- Cycle History and Prediction Models ---
+class PeriodEvent(BaseModel):
+    startDate: str  # YYYY-MM-DD
+    endDate: Optional[str] = None  # YYYY-MM-DD
+    flow: Optional[str] = None  # light|medium|heavy
+    notes: Optional[str] = None
+
+
+class AddPeriodRequest(BaseModel):
+    startDate: str
+    endDate: Optional[str] = None
+    flow: Optional[str] = None
+    notes: Optional[str] = None
+
+
+# In-memory cycle store (hackathon-safe). In production, replace with DB keyed by patient_id.
+_cycle_periods: List[PeriodEvent] = []
+
 
 print("     Loading AI models...")
 _whisper_model = whisper.load_model("base")
@@ -57,7 +78,7 @@ app = FastAPI(
     title="Vitality - Women's Health Intelligence API",
     description=(
         "Multimodal biometric and vocal biomarker platform for proactive "
-        "management of PMDD, PCOS, and perimenopause."
+        "management of PMDD, PCOS, and endometriosis."
     ),
     version="1.0.0",
 )
@@ -98,6 +119,84 @@ def _ensure_consolidated(profile: Optional[str] = None) -> Any:
             profile=prof,
         )
     return _latest_consolidated
+
+
+# --- Cycle Helper Functions ---
+def _parse_date_ymd(s: str) -> datetime:
+    return datetime.strptime(s, "%Y-%m-%d")
+
+
+def _cycle_stats(periods: List[PeriodEvent]) -> Dict[str, Any]:
+    if len(periods) < 2:
+        return {
+            "median_cycle_length": None,
+            "variability_days": None,
+            "median_period_length": None,
+            "confidence": "low",
+        }
+
+    starts = [_parse_date_ymd(p.startDate) for p in periods]
+    cycle_lengths = []
+    for i in range(len(starts) - 1):
+        cycle_lengths.append((starts[i + 1] - starts[i]).days)
+
+    cycle_lengths_sorted = sorted(cycle_lengths)
+    mid = len(cycle_lengths_sorted) // 2
+    if len(cycle_lengths_sorted) % 2 == 1:
+        median_cycle = cycle_lengths_sorted[mid]
+    else:
+        median_cycle = (cycle_lengths_sorted[mid - 1] + cycle_lengths_sorted[mid]) / 2
+
+    mad = sum(abs(cl - median_cycle) for cl in cycle_lengths) / len(cycle_lengths)
+
+    period_lengths = []
+    for p in periods:
+        if p.endDate:
+            period_lengths.append((_parse_date_ymd(p.endDate) - _parse_date_ymd(p.startDate)).days + 1)
+
+    median_period = None
+    if period_lengths:
+        pl = sorted(period_lengths)
+        m2 = len(pl) // 2
+        median_period = pl[m2] if len(pl) % 2 == 1 else (pl[m2 - 1] + pl[m2]) / 2
+
+    if mad <= 1.5:
+        conf = "high"
+    elif mad <= 3.5:
+        conf = "medium"
+    else:
+        conf = "low"
+
+    return {
+        "median_cycle_length": median_cycle,
+        "variability_days": round(mad, 2),
+        "median_period_length": median_period,
+        "confidence": conf,
+    }
+
+
+def _cycle_predictions(periods: List[PeriodEvent]) -> Dict[str, Any]:
+    if not periods:
+        return {"next_period_start": None, "ovulation_date": None}
+
+    periods_sorted = sorted(periods, key=lambda p: p.startDate)
+    last_start = _parse_date_ymd(periods_sorted[-1].startDate)
+    stats = _cycle_stats(periods_sorted)
+
+    cycle_len = stats["median_cycle_length"]
+    if cycle_len is None:
+        cycle_len = 28
+
+    next_start = datetime(last_start.year, last_start.month, last_start.day)
+    next_start = next_start.replace(hour=0, minute=0, second=0, microsecond=0)
+    next_start = next_start + timedelta(days=int(round(cycle_len)))
+
+    ovulation = next_start - timedelta(days=14)
+
+    return {
+        "next_period_start": next_start.strftime("%Y-%m-%d"),
+        "ovulation_date": ovulation.strftime("%Y-%m-%d"),
+    }
 
 
 def transcribe(file_path: str) -> str:
@@ -142,10 +241,7 @@ async def analyze_voice(file: UploadFile = File(...)):
 
 @app.get("/consolidated")
 async def get_consolidated(
-    profile: Optional[str] = Query(
-        default=None,
-        description="Cycle state: follicular, ovulation, luteal_mild, luteal_pms, pmdd_crisis, pcos_flare, perimenopause",
-    ),
+    profile: Optional[str] = Query(default=None),
 ):
     global _latest_consolidated
     try:
@@ -276,13 +372,47 @@ async def get_status():
     }
 
 
+@app.get("/cycle/periods")
+async def get_cycle_periods():
+    periods_sorted = sorted(_cycle_periods, key=lambda p: p.startDate)
+    stats = _cycle_stats(periods_sorted)
+    preds = _cycle_predictions(periods_sorted)
+
+    return {
+        "status": "success",
+        "periods": [p.dict() for p in periods_sorted],
+        "stats": stats,
+        "predictions": preds,
+    }
+
+
+@app.post("/cycle/periods")
+async def add_cycle_period(req: AddPeriodRequest):
+    global _cycle_periods
+    if any(p.startDate == req.startDate for p in _cycle_periods):
+        _cycle_periods = [p for p in _cycle_periods if p.startDate != req.startDate]
+
+    _cycle_periods.append(PeriodEvent(
+        startDate=req.startDate,
+        endDate=req.endDate,
+        flow=req.flow,
+        notes=req.notes,
+    ))
+
+    periods_sorted = sorted(_cycle_periods, key=lambda p: p.startDate)
+    stats = _cycle_stats(periods_sorted)
+    preds = _cycle_predictions(periods_sorted)
+
+    return {
+        "status": "success",
+        "periods": [p.dict() for p in periods_sorted],
+        "stats": stats,
+        "predictions": preds,
+    }
+
+
 @app.put("/settings/wearable-profile")
-async def set_wearable_profile(
-    profile: str = Query(
-        ...,
-        description="Cycle state: follicular, ovulation, luteal_mild, luteal_pms, pmdd_crisis, pcos_flare, perimenopause",
-    ),
-):
+async def set_wearable_profile(profile: str = Query(...)):
     global _wearable_profile, _apple_watch, _oura_ring, _dexcom
 
     if profile not in VALID_PROFILES:
@@ -339,10 +469,7 @@ async def get_coaching_plan(profile: Optional[str] = Query(default=None)):
 
 
 @app.post("/intelligence/chat")
-async def chat_with_assistant(
-    req: ChatRequest,
-    profile: Optional[str] = Query(default=None),
-):
+async def chat_with_assistant(req: ChatRequest, profile: Optional[str] = Query(default=None)):
     try:
         result = _ensure_consolidated(profile)
         reply = handle_virtual_assistant(
@@ -365,29 +492,19 @@ async def get_smart_alert(profile: Optional[str] = Query(default=None)):
 
 
 @app.get("/history/vitality")
-async def history_vitality(
-    profile: Optional[str] = Query(default=None),
-    days: int = Query(default=30, ge=1, le=365),
-):
+async def history_vitality(profile: Optional[str] = Query(default=None), days: int = Query(default=30, ge=1, le=365)):
     prof = _resolve_profile(profile)
     return {"profile": prof, "days": days, "history": get_historical_vitality(prof, days)}
 
 
 @app.get("/history/hourly")
-async def history_hourly(
-    profile: Optional[str] = Query(default=None),
-    hours: int = Query(default=48, ge=1, le=168),
-):
+async def history_hourly(profile: Optional[str] = Query(default=None), hours: int = Query(default=48, ge=1, le=168)):
     prof = _resolve_profile(profile)
     return {"profile": prof, "hours": hours, "history": get_hourly_vitality(prof, hours)}
 
 
 @app.get("/history/signal/{signal_name}")
-async def history_signal(
-    signal_name: str,
-    profile: Optional[str] = Query(default=None),
-    days: int = Query(default=30, ge=1, le=365),
-):
+async def history_signal(signal_name: str, profile: Optional[str] = Query(default=None), days: int = Query(default=30, ge=1, le=365)):
     prof = _resolve_profile(profile)
     data = get_signal_history(prof, signal_name, days)
     if data and "error" in data[0]:
@@ -396,10 +513,7 @@ async def history_signal(
 
 
 @app.get("/history/timeline")
-async def history_timeline(
-    profile: Optional[str] = Query(default=None),
-    days: int = Query(default=30, ge=1, le=365),
-):
+async def history_timeline(profile: Optional[str] = Query(default=None), days: int = Query(default=30, ge=1, le=365)):
     prof = _resolve_profile(profile)
     return get_composite_timeline(prof, days)
 
@@ -411,10 +525,7 @@ async def history_events(profile: Optional[str] = Query(default=None)):
 
 
 @app.get("/history/trends")
-async def history_trends(
-    profile: Optional[str] = Query(default=None),
-    days: int = Query(default=30, ge=1, le=365),
-):
+async def history_trends(profile: Optional[str] = Query(default=None), days: int = Query(default=30, ge=1, le=365)):
     prof = _resolve_profile(profile)
     return {"profile": prof, "days": days, "trends": compute_all_trends(prof, days)}
 

@@ -55,7 +55,7 @@ export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0, letterSpacing: '-0.02em' }}>
-            Good afternoon, Dr. Mitchell
+            Welcome Dr. See
           </h2>
           <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0', fontWeight: 500 }}>
             Vitality has flagged {triageCases.filter(c => c.level === 'emergency').length} critical cases requiring your attention.

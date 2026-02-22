@@ -99,7 +99,7 @@ export default function RolePicker({ onSelect }: { onSelect: (role: Role) => voi
           color: '#6b7280', fontSize: 15, margin: '8px 0 0', fontWeight: 500,
           letterSpacing: '0.01em'
         }}>
-          Multimodal predictive care for women
+          A preventive partner that treats symptoms like vital signs
         </p>
       </div>
 
