@@ -384,7 +384,7 @@ def llm_extract(text: str) -> dict:
             default_headers={"HTTP-Referer": "https://haxxess.app"},
         )
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="google/gemini-2.0-flash-exp:free",
             messages=[
                 {"role": "system", "content": "You extract medical intake data. Return only valid JSON."},
                 {"role": "user",   "content": _EXTRACTION_PROMPT + text},
