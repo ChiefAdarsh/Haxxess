@@ -127,7 +127,10 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
       style={{
         display: "flex",
         height: "100vh",
-        overflow: "hidden",
+        width: "100vw",
+        maxWidth: "100vw",
+        overflowX: "hidden",
+        overflowY: "hidden",
         fontFamily: "Inter, system-ui, sans-serif",
         backgroundColor: "#fdfafa",
       }}
@@ -214,7 +217,7 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
           style={{
             position: "relative",
             flex: 1,
-            padding: "28px 32px",
+            padding: "clamp(16px, 3vw, 32px)",
             overflow: "auto",
             zIndex: 10,
           }}

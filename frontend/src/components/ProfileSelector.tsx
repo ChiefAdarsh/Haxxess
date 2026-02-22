@@ -39,7 +39,16 @@ export default function ProfileSelector() {
   };
 
   return (
-    <div style={{ padding: "12px 16px", borderTop: "1px solid #f1f5f9" }}>
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "100vw",
+        boxSizing: "border-box",
+        padding: "12px 16px",
+        borderTop: "1px solid #f1f5f9",
+        overflowX: "hidden",
+      }}
+    >
       <p
         style={{
           fontSize: 11,
@@ -52,12 +61,15 @@ export default function ProfileSelector() {
       >
         Cycle state
       </p>
+
       <select
         value={profile}
         onChange={(e) => handleChange(e.target.value)}
         disabled={updating}
         style={{
           width: "100%",
+          maxWidth: "100%",
+          boxSizing: "border-box",
           padding: "10px 12px",
           borderRadius: 8,
           border: "1px solid #e5e7eb",
@@ -74,6 +86,7 @@ export default function ProfileSelector() {
           </option>
         ))}
       </select>
+
       {updating && (
         <p style={{ fontSize: 10, color: "#94a3b8", margin: "4px 0 0" }}>
           Updating pipeline...
