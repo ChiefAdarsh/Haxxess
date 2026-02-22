@@ -9,6 +9,7 @@ import whisper
 import uvicorn
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 import asyncio
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
@@ -45,10 +46,8 @@ VALID_PROFILES = {
     "baseline",
 }
 
-
 class ChatRequest(BaseModel):
     message: str
-
 
 print("     Loading AI models...")
 _whisper_model = whisper.load_model("base")
@@ -62,6 +61,8 @@ app = FastAPI(
     ),
     version="1.0.0",
 )
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,
