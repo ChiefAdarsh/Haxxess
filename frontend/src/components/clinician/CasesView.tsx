@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   FileText,
   Activity,
@@ -13,48 +13,18 @@ import { triageLevelConfig } from "../../engine/triage";
 import type { Patient } from "../../config/patients";
 import type { TriageLevel } from "../../types";
 
-const mockCases = [
-  {
-    id: "c1",
-    patient: patients[0],
-    level: "emergency" as TriageLevel,
-    summary: "Heavy bleeding + vocal distress",
-    source: "multimodal",
-    time: "12 min ago",
-  },
-  {
-    id: "c2",
-    patient: patients[3],
-    level: "emergency" as TriageLevel,
-    summary: "Temp spike + severe pelvic pain, nausea",
-    source: "sensor fusion",
-    time: "34 min ago",
-  },
-  {
-    id: "c3",
-    patient: patients[5],
-    level: "same_day" as TriageLevel,
-    summary: "Burning with urination, pelvic pressure 7/10",
-    source: "symptom log",
-    time: "1 hr ago",
-  },
-  {
-    id: "c4",
-    patient: patients[1],
-    level: "same_day" as TriageLevel,
-    summary: "Fever + pelvic midline pain",
-    source: "call-in",
-    time: "2 hrs ago",
-  },
-  {
-    id: "c5",
-    patient: patients[2],
-    level: "routine" as TriageLevel,
-    summary: "Recurring cramps, cycle day 14",
-    source: "symptom log",
-    time: "3 hrs ago",
-  },
-];
+function tierToTriageLevel(tierId: string): TriageLevel {
+  if (tierId === "CRITICAL") return "emergency";
+  if (tierId === "ELEVATED") return "same_day";
+  if (tierId === "WATCH") return "routine";
+  return "self_care";
+}
+
+const currentPatientName =
+  typeof window !== "undefined"
+    ? localStorage.getItem("vitality_patient_name") || patients[0]?.name
+    : patients[0]?.name;
+const currentPatientForCases = { ...patients[0], name: currentPatientName || "Current Patient" };
 
 interface CasesViewProps {
   onSelectPatient: (patient: Patient) => void;
@@ -101,6 +71,40 @@ export default function CasesView({ onSelectPatient }: CasesViewProps) {
         "[behavioral] Behavioral module not connected",
       ].includes(f),
   );
+
+  const casesList = useMemo(() => {
+    const tierId = vitality?.tier_id ?? "STABLE";
+    const level = tierToTriageLevel(tierId);
+    const summary =
+      vitality?.summary ||
+      alert?.message ||
+      alert?.title ||
+      "No summary";
+    const liveCase = {
+      id: "c-live",
+      patient: currentPatientForCases,
+      level,
+      summary,
+      source: "pipeline",
+    };
+    const demos = [
+      {
+        id: "c-demo-2",
+        patient: patients[3],
+        level: "same_day" as TriageLevel,
+        summary: "Temp spike + pelvic pain (demo)",
+        source: "demo",
+      },
+      {
+        id: "c-demo-3",
+        patient: patients[1],
+        level: "routine" as TriageLevel,
+        summary: "Recurring cramps (demo)",
+        source: "demo",
+      },
+    ];
+    return online ? [liveCase, ...demos] : [liveCase, ...demos];
+  }, [status, alert, vitality, online]);
 
   return (
     <div className="space-y-6">
@@ -241,9 +245,10 @@ export default function CasesView({ onSelectPatient }: CasesViewProps) {
           </h3>
         </div>
         <div className="flex flex-col gap-3">
-          {mockCases.map((c) => {
+          {casesList.map((c) => {
             const cfg = triageLevelConfig[c.level];
             const isCritical = c.level === "emergency";
+            const isLive = c.source === "pipeline";
             return (
               <button
                 key={c.id}
@@ -261,7 +266,7 @@ export default function CasesView({ onSelectPatient }: CasesViewProps) {
                     .join("")}
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 flex-wrap">
                     <span className="text-sm font-semibold text-slate-900">
                       {c.patient.name}
                     </span>
@@ -274,6 +279,11 @@ export default function CasesView({ onSelectPatient }: CasesViewProps) {
                     >
                       {cfg.label}
                     </span>
+                    {isLive && (
+                      <span className="text-[10px] font-bold px-2 py-1 rounded bg-pink-700 text-white uppercase">
+                        live
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm text-slate-400 mt-1">{c.summary}</p>
                 </div>

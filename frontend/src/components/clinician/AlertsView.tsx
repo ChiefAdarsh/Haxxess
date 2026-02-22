@@ -25,62 +25,11 @@ interface Alert {
   acknowledged: boolean;
 }
 
-const initialAlerts: Alert[] = [
-  {
-    id: "1",
-    patient: patients[0],
-    message: "Acoustic vocal tremor + Heavy bleeding, soaking pad in 2 hours",
-    level: "emergency",
-    icon: "voice",
-    time: "12 min ago",
-    acknowledged: false,
-  },
-  {
-    id: "2",
-    patient: patients[3],
-    message: "Oura Temp spike + Severe right-sided pelvic pain with nausea",
-    level: "emergency",
-    icon: "temp",
-    time: "34 min ago",
-    acknowledged: false,
-  },
-  {
-    id: "3",
-    patient: patients[5],
-    message: "HRV dropped 30% below baseline with reported pelvic pressure",
-    level: "same_day",
-    icon: "vitals",
-    time: "1 hr ago",
-    acknowledged: false,
-  },
-  {
-    id: "4",
-    patient: patients[1],
-    message: "Burning with urination, suprapubic pressure 7/10",
-    level: "same_day",
-    icon: "vitals",
-    time: "2 hrs ago",
-    acknowledged: false,
-  },
-  {
-    id: "5",
-    patient: patients[2],
-    message: "Pain pattern shifted from diffuse to right-sided over 6 hrs",
-    level: "same_day",
-    icon: "vitals",
-    time: "3 hrs ago",
-    acknowledged: false,
-  },
-  {
-    id: "6",
-    patient: patients[4],
-    message: "Mild cramping resolved after rest (Vitality Index stable)",
-    level: "self_care",
-    icon: "vitals",
-    time: "5 hrs ago",
-    acknowledged: true,
-  },
-];
+const currentPatientForAlerts =
+  typeof window !== "undefined" &&
+  localStorage.getItem("vitality_patient_name")
+    ? { ...patients[0], name: localStorage.getItem("vitality_patient_name")! }
+    : patients[0];
 
 const iconMap = {
   vitals: Activity,
@@ -90,45 +39,68 @@ const iconMap = {
 };
 
 export default function AlertsView() {
-  const [alerts, setAlerts] = useState(initialAlerts);
+  const [liveAlertData, setLiveAlertData] = useState<{
+    title?: string;
+    message?: string;
+    summary?: string;
+    severity?: string;
+  } | null>(null);
   const [backendConnected, setBackendConnected] = useState(false);
+  const [acknowledgedIds, setAcknowledgedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
     async function fetchLiveAlert() {
       try {
         const res = await getSmartAlert();
-        if (cancelled || !res?.data) return;
+        if (cancelled) return;
         setBackendConnected(true);
-        if (!alerts.find((a) => a.id === "live-backend") && res.data.title) {
-          const liveAlert: Alert = {
-            id: "live-backend",
-            patient: patients[0],
-            message: `${res.data.title}: ${res.data.message || res.data.summary || ""}`,
-            level: res.data.severity === "critical" ? "emergency" : "same_day",
-            icon: "vitals",
-            time: "just now",
-            acknowledged: false,
-          };
-          setAlerts((prev) => [liveAlert, ...prev]);
+        if (res?.data && (res.data.title || res.data.message || res.data.summary)) {
+          setLiveAlertData({
+            title: res.data.title,
+            message: res.data.message,
+            summary: res.data.summary,
+            severity: res.data.severity,
+          });
+        } else {
+          setLiveAlertData(null);
         }
       } catch {
         if (!cancelled) setBackendConnected(false);
       }
     }
     fetchLiveAlert();
+    const interval = setInterval(fetchLiveAlert, 15000);
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, []);
 
-  const acknowledge = (id: string) =>
-    setAlerts(
-      alerts.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)),
-    );
+  const liveAlertAsAlert: Alert | null = liveAlertData
+    ? {
+        id: "live-backend",
+        patient: currentPatientForAlerts,
+        message: [liveAlertData.title, liveAlertData.message || liveAlertData.summary]
+          .filter(Boolean)
+          .join(": "),
+        level: liveAlertData.severity === "critical" ? "emergency" : "same_day",
+        icon: "vitals",
+        time: "Live",
+        acknowledged: acknowledgedIds.has("live-backend"),
+      }
+    : null;
 
-  const active = alerts.filter((a) => !a.acknowledged);
-  const resolved = alerts.filter((a) => a.acknowledged);
+  const active = liveAlertAsAlert && !acknowledgedIds.has("live-backend")
+    ? [liveAlertAsAlert]
+    : [];
+
+  const acknowledge = (id: string) =>
+    setAcknowledgedIds((prev) => new Set(prev).add(id));
+
+  const resolved: Alert[] = liveAlertAsAlert && acknowledgedIds.has("live-backend")
+    ? [liveAlertAsAlert]
+    : [];
 
   return (
     <div className="space-y-6">
@@ -165,6 +137,11 @@ export default function AlertsView() {
       </div>
 
       <div className="flex flex-col gap-4">
+        {active.length === 0 && !liveAlertData && backendConnected && (
+          <div className="p-6 rounded-xl border border-slate-200 bg-slate-50 text-center text-slate-500 text-sm font-medium">
+            No active alerts — pipeline clear.
+          </div>
+        )}
         {active.map((alert) => {
           const Icon = iconMap[alert.icon];
           const cfg = triageLevelConfig[alert.level];

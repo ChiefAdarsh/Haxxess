@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   AlertTriangle,
   Users,
@@ -14,78 +14,64 @@ import { getStatus, getSmartAlert } from "../../api/client";
 import type { Patient } from "../../config/patients";
 import type { TriageLevel } from "../../types";
 
-const triageCases = [
+function tierToTriageLevel(tierId: string): TriageLevel {
+  if (tierId === "CRITICAL") return "emergency";
+  if (tierId === "ELEVATED") return "same_day";
+  if (tierId === "WATCH") return "routine";
+  return "self_care";
+}
+
+const patientName =
+  typeof window !== "undefined"
+    ? localStorage.getItem("vitality_patient_name") || patients[0]?.name
+    : patients[0]?.name;
+
+const currentPatient: Patient = {
+  ...patients[0],
+  name: patientName || "Current Patient",
+};
+
+const fallbackCases: Array<{
+  id: string;
+  patient: Patient;
+  level: TriageLevel;
+  summary: string;
+  source: string;
+  time: string;
+}> = [
   {
-    id: "c1",
-    patient: patients[0],
-    level: "emergency" as TriageLevel,
-    summary: "Acoustic vocal tremor + Heavy bleeding, soaking pad in 2 hours",
-    source: "multimodal  lag",
-    time: "12 min ago",
-  },
-  {
-    id: "c2",
+    id: "c-demo-2",
     patient: patients[3],
-    level: "emergency" as TriageLevel,
-    summary: "Oura Temp spike + Severe right-sided pelvic pain with nausea",
-    source: "sensor fusion",
-    time: "34 min ago",
+    level: "same_day",
+    summary: "Temp spike + severe pelvic pain (demo)",
+    source: "demo",
+    time: "—",
   },
   {
-    id: "c3",
-    patient: patients[5],
-    level: "same_day" as TriageLevel,
-    summary: "Burning with urination, pelvic pressure 7/10",
-    source: "symptom log",
-    time: "1 hr ago",
-  },
-  {
-    id: "c4",
+    id: "c-demo-3",
     patient: patients[1],
-    level: "same_day" as TriageLevel,
-    summary: "Fever reported with pelvic midline pain",
-    source: "call-in",
-    time: "2 hrs ago",
-  },
-  {
-    id: "c5",
-    patient: patients[2],
-    level: "routine" as TriageLevel,
-    summary: "Recurring dull cramps, cycle day 14",
-    source: "symptom log",
-    time: "3 hrs ago",
-  },
-  {
-    id: "c6",
-    patient: patients[4],
-    level: "self_care" as TriageLevel,
-    summary: "Mild low back discomfort after exercise",
-    source: "symptom log",
-    time: "5 hrs ago",
+    level: "routine",
+    summary: "Recurring cramps, cycle day 14 (demo)",
+    source: "demo",
+    time: "—",
   },
 ];
 
-const stats = [
-  {
-    label: "Active Cases",
-    value: triageCases.length.toString(),
-    icon: Activity,
-  },
+const statsFromCases = (
+  cases: Array<{ level: TriageLevel }>,
+) => [
+  { label: "Active Cases", value: cases.length.toString(), icon: Activity },
   {
     label: "Critical / ER",
-    value: triageCases.filter((c) => c.level === "emergency").length.toString(),
+    value: cases.filter((c) => c.level === "emergency").length.toString(),
     icon: AlertTriangle,
   },
   {
     label: "Same-Day Risk",
-    value: triageCases.filter((c) => c.level === "same_day").length.toString(),
+    value: cases.filter((c) => c.level === "same_day").length.toString(),
     icon: Clock,
   },
-  {
-    label: "Total Patients",
-    value: patients.length.toString(),
-    icon: Users,
-  },
+  { label: "Total Patients", value: patients.length.toString(), icon: Users },
 ];
 
 interface DashboardHomeProps {
@@ -96,27 +82,60 @@ export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
   const [backendStatus, setBackendStatus] = useState<
     "connecting" | "online" | "offline"
   >("connecting");
+  const [status, setStatus] = useState<any>(null);
   const [liveAlert, setLiveAlert] = useState<any>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function check() {
       try {
-        const [alert] = await Promise.all([getStatus(), getSmartAlert()]);
+        const [s, alertRes] = await Promise.all([
+          getStatus(),
+          getSmartAlert(),
+        ]);
         if (cancelled) return;
         setBackendStatus("online");
-        setLiveAlert(alert?.data || null);
+        setStatus(s);
+        setLiveAlert(alertRes?.data || null);
       } catch {
         if (!cancelled) setBackendStatus("offline");
       }
     }
     check();
-    const interval = setInterval(check, 30000);
+    const interval = setInterval(check, 15000);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
   }, []);
+
+  const triageCases = useMemo(() => {
+    const vitality = status?.vitality;
+    const tierId = vitality?.tier_id ?? "STABLE";
+    const level = tierToTriageLevel(tierId);
+    const summary =
+      vitality?.summary ||
+      liveAlert?.message ||
+      liveAlert?.title ||
+      "No summary";
+    const liveCase = {
+      id: "c-live",
+      patient: currentPatient,
+      level,
+      summary,
+      source: "pipeline",
+      time: "Live",
+    };
+    if (backendStatus !== "online" || !status) {
+      return [liveCase, ...fallbackCases];
+    }
+    return [liveCase, ...fallbackCases];
+  }, [status, liveAlert, backendStatus]);
+
+  const stats = useMemo(
+    () => statsFromCases(triageCases),
+    [triageCases],
+  );
 
   const backendStyles =
     backendStatus === "online"
@@ -124,6 +143,8 @@ export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
       : backendStatus === "offline"
         ? "bg-red-50 border-red-200 text-red-800"
         : "bg-slate-50 border-slate-200 text-slate-500";
+
+  const criticalCount = triageCases.filter((c) => c.level === "emergency").length;
 
   return (
     <div>
@@ -133,9 +154,8 @@ export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
             Welcome Dr. See
           </h2>
           <p className="text-sm text-slate-500 mt-1 font-medium">
-            Vitality has flagged{" "}
-            {triageCases.filter((c) => c.level === "emergency").length} critical
-            cases requiring your attention.
+            Vitality has flagged {criticalCount} critical case
+            {criticalCount !== 1 ? "s" : ""} requiring your attention.
           </p>
         </div>
         <div
@@ -229,6 +249,7 @@ export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
           {triageCases.map((c) => {
             const cfg = triageLevelConfig[c.level];
             const isCritical = c.level === "emergency";
+            const isLive = c.source === "pipeline";
 
             return (
               <button
@@ -277,8 +298,13 @@ export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
                       {cfg.label}
                     </span>
                     <span className="text-[10px] font-semibold px-2 py-1 rounded bg-slate-100 text-slate-500 uppercase tracking-wide">
-                      {c.source}
+                      {isLive ? "pipeline" : c.source}
                     </span>
+                    {isLive && (
+                      <span className="text-[10px] font-bold px-2 py-1 rounded bg-pink-700 text-white uppercase">
+                        live
+                      </span>
+                    )}
                   </div>
                   <p className="text-[13px] text-slate-600 mt-1.5 font-medium">
                     {c.summary}

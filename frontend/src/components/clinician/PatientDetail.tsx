@@ -9,7 +9,7 @@ import {
   Activity,
   AlertTriangle,
 } from "lucide-react";
-import { getConsolidated, getForecast } from "../../api/client";
+import { getConsolidated, getForecast, getSmartAlert, getSymptoms } from "../../api/client";
 import type { Patient } from "../../config/patients";
 
 const urgencyColor = {
@@ -26,18 +26,24 @@ interface PatientDetailProps {
 export default function PatientDetail({ patient, onBack }: PatientDetailProps) {
   const [liveData, setLiveData] = useState<any>(null);
   const [forecastData, setForecastData] = useState<any>(null);
+  const [alertData, setAlertData] = useState<any>(null);
+  const [symptoms, setSymptoms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [vitRes, foreRes] = await Promise.all([
+        const [vitRes, foreRes, alertRes, symptomsRes] = await Promise.all([
           getConsolidated(),
           getForecast(),
+          getSmartAlert(),
+          getSymptoms(14).catch(() => ({ symptoms: [] })),
         ]);
         if (vitRes) setLiveData(vitRes);
         if (foreRes?.data) setForecastData(foreRes.data);
+        if (alertRes?.data) setAlertData(alertRes.data);
+        if (Array.isArray(symptomsRes?.symptoms)) setSymptoms(symptomsRes.symptoms);
       } catch {
       } finally {
         setLoading(false);
@@ -45,7 +51,7 @@ export default function PatientDetail({ patient, onBack }: PatientDetailProps) {
     };
 
     fetchData();
-  }, []);
+  }, [patient.id]);
 
   const score = liveData ? Math.round(liveData.vitality_index) : 75;
   const scoreColor =
@@ -256,6 +262,59 @@ export default function PatientDetail({ patient, onBack }: PatientDetailProps) {
               </div>
             )}
           </div>
+
+          {alertData && (alertData.title || alertData.message || alertData.summary) && (
+            <div
+              className={`rounded-2xl border p-5 flex items-start gap-3 ${
+                alertData.severity === "critical"
+                  ? "bg-red-50 border-red-200"
+                  : "bg-amber-50 border-amber-200"
+              }`}
+            >
+              <AlertTriangle
+                size={20}
+                className={
+                  alertData.severity === "critical"
+                    ? "text-red-600 shrink-0 mt-0.5"
+                    : "text-amber-600 shrink-0 mt-0.5"
+                }
+              />
+              <div>
+                <p className="text-sm font-semibold text-slate-900 m-0">
+                  {alertData.title || "AI Alert"}
+                </p>
+                <p className="text-xs text-slate-600 mt-1 m-0">
+                  {alertData.message || alertData.summary || ""}
+                </p>
+                <span className="text-[10px] font-bold text-pink-700 uppercase mt-2 inline-block">
+                  Live pipeline
+                </span>
+              </div>
+            </div>
+          )}
+
+          {symptoms.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                Recent body-map symptoms (pipeline)
+              </h3>
+              <div className="flex flex-col gap-2">
+                {symptoms.slice(0, 5).map((s: any) => (
+                  <div
+                    key={s.id || s.timestamp}
+                    className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0"
+                  >
+                    <span className="text-sm text-slate-700">
+                      {s.region} · {s.type} (severity {s.severity}/10)
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {s.timestamp ? new Date(s.timestamp).toLocaleDateString() : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">

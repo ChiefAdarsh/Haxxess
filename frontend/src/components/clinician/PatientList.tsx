@@ -1,4 +1,6 @@
+import { useState, useEffect } from "react";
 import { patients } from "../../config/patients";
+import { getStatus } from "../../api/client";
 import type { Patient } from "../../config/patients";
 
 const urgencyColor = {
@@ -24,6 +26,24 @@ interface PatientListProps {
 }
 
 export default function PatientList({ onSelectPatient }: PatientListProps) {
+  const [status, setStatus] = useState<{ vitality?: { index?: number; tier_label?: string } } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getStatus()
+      .then((s) => {
+        if (!cancelled) setStatus(s);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const vitality = status?.vitality;
+  const liveVitalityIndex = vitality?.index;
+  const liveTierLabel = vitality?.tier_label;
+
   return (
     <div>
       <div
@@ -54,7 +74,7 @@ export default function PatientList({ onSelectPatient }: PatientListProps) {
               fontWeight: 500,
             }}
           >
-            Active monitoring across {patients.length} patients
+            Active monitoring across {patients.length} patients · First card = live pipeline
           </p>
         </div>
       </div>
@@ -66,8 +86,9 @@ export default function PatientList({ onSelectPatient }: PatientListProps) {
           gap: 24,
         }}
       >
-        {patients.map((p) => {
+        {patients.map((p, index) => {
           const isCritical = p.urgency === "critical";
+          const isLivePipeline = index === 0 && status != null;
           return (
             <button
               key={p.id}
@@ -172,6 +193,26 @@ export default function PatientList({ onSelectPatient }: PatientListProps) {
               >
                 {p.age} yrs &middot; {p.condition}
               </span>
+
+              {isLivePipeline && (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "4px 10px",
+                    borderRadius: 12,
+                    backgroundColor: "#fdf2f8",
+                    color: "#be185d",
+                    marginBottom: 8,
+                    border: "1px solid #fbcfe8",
+                  }}
+                >
+                  Live · {liveVitalityIndex != null ? `${Math.round(liveVitalityIndex)}/100` : "—"} {liveTierLabel ? `· ${liveTierLabel}` : ""}
+                </div>
+              )}
 
               {/* Status Badge */}
               <div
