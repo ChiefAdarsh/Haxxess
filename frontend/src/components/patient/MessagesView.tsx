@@ -83,7 +83,7 @@ export default function MessagesView() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(92vh - 120px)' }}>
       {!escalated && (
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -116,7 +116,7 @@ export default function MessagesView() {
       )}
 
       <div style={{
-        flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12,
+        flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12,
         padding: '16px', backgroundColor: '#fff', borderRadius: 12, border: '1px solid #e5e7eb',
       }}>
         {messages.map((msg) => {

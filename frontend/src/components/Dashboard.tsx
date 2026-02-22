@@ -116,6 +116,7 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
       <div style={{
         flex: 1,
         display: 'flex',
+        minHeight: 0,
         flexDirection: 'column',
         backgroundColor: '#f8fafc',
         position: 'relative',
