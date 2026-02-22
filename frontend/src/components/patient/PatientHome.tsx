@@ -3,6 +3,7 @@ import { useSymptoms } from '../../context/SymptomContext'
 import { triageSymptoms, triageLevelConfig } from '../../engine/triage'
 import { AlertTriangle, Activity, MapPin, Calendar, Mic, Square, Loader2 } from 'lucide-react'
 import type { BodyRegion } from '../../types'
+import { fetchLiveVitals, analyzeVoice } from '../../api'
 
 const regionLabels: Record<BodyRegion, string> = {
   LLQ: 'Left Lower Quadrant',
@@ -41,21 +42,20 @@ export default function PatientHome() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
 
-  const fetchScore = async () => {
+  const fetchScore = async (forceRefresh = false) => {
     try {
-      const res = await fetch('http://localhost:8000/consolidated')
-      const data = await res.json()
-      if (data.status === 'success') {
+      const data = await fetchLiveVitals(null, forceRefresh)
+      if (data?.status === 'success') {
         setHealthScore(Math.round(data.vitality_index))
         setTierLabel(data.tier.label)
       }
     } catch (err) {
-      console.error("Failed to fetch score", err)
+      console.error('Failed to fetch score', err)
     }
   }
 
   useEffect(() => {
-    fetchScore()
+    fetchScore(true)
   }, [])
 
   const startRecording = async () => {
