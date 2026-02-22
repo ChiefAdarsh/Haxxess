@@ -5,6 +5,9 @@ import {
   Phone,
   CalendarDays,
   Activity,
+  MessageCircle,
+  HeartPulse,
+  Dumbbell,
   LayoutDashboard,
   Users,
   AlertTriangle,
@@ -14,6 +17,9 @@ import type { Tab } from '../types'
 
 export const patientTabs: Tab[] = [
   { id: 'home', label: 'Home', icon: Home },
+  { id: 'messages', label: 'Chat', icon: MessageCircle },
+  { id: 'vitals', label: 'Vitals', icon: HeartPulse },
+  { id: 'wellness', label: 'Wellness', icon: Dumbbell },
   { id: 'bodymap', label: 'Body Map', icon: PersonStanding },
   { id: 'tracker', label: 'Symptom Tracker', icon: Activity },
   { id: 'cycle', label: 'Cycle', icon: CalendarDays },

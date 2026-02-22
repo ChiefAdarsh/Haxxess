@@ -1,5 +1,6 @@
 import { Sparkles, LogOut } from 'lucide-react'
 import type { Tab } from '../types'
+import ProfileSelector from './ProfileSelector'
 
 interface SidebarProps {
   role: string
@@ -63,6 +64,8 @@ export default function Sidebar({ role, tabs, active, onTabChange, onLogout }: S
       }}>
         {role} Portal
       </div>
+
+      {role === 'patient' && <ProfileSelector />}
 
       {/* Nav Tabs */}
       <nav style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: 6 }}>

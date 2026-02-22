@@ -2,11 +2,11 @@ import os
 import json
 import logging
 import requests
-from typing import Any, Optional
+from typing import Any, Optional, List, Dict
 
 logger = logging.getLogger("intelligence")
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_API_KEY = (os.getenv("OPENROUTER_API_KEY") or "").strip()
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL_ID = "arcee-ai/trinity-large-preview:free"
 REQUEST_TIMEOUT = 20
@@ -48,12 +48,100 @@ def _call_openrouter(
             OPENROUTER_URL, headers=headers, json=payload, timeout=REQUEST_TIMEOUT
         )
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        data = resp.json()
+        choices = data.get("choices") or [] if isinstance(data, dict) else []
+        first = choices[0] if choices else {}
+        msg = first.get("message") or first
+        content = msg.get("content") if isinstance(msg, dict) else None
+        if content is None:
+            content = msg.get("text", "")
+        if content is None:
+            content = ""
+        if isinstance(content, str) and content.strip():
+            logger.info("OpenRouter reply received (%d chars)", len(content))
+        elif content == "":
+            logger.warning("OpenRouter 200 but empty content. Body sample: %s", (resp.text or "")[:400])
+        return (content or "").strip() or ""
     except requests.Timeout:
         logger.error("OpenRouter request timed out.")
         return ""
     except requests.HTTPError as e:
-        logger.error(f"OpenRouter HTTP error: {e} - {resp.text[:300]}")
+        if getattr(e.response, "status_code", None) == 401:
+            logger.error("OpenRouter 401: invalid or missing API key. Check OPENROUTER_API_KEY in .env (get one at openrouter.ai/keys)")
+        else:
+            logger.error(f"OpenRouter HTTP error: {e} - {resp.text[:300]}")
+        return ""
+    except Exception as e:
+        logger.error(f"OpenRouter call failed: {e}")
+        return ""
+
+
+def _call_openrouter_with_history(
+    system_prompt: str,
+    context_user_message: str,
+    history: List[Dict[str, str]],
+    new_user_message: str,
+    temperature: float = 0.6,
+    max_tokens: int = 512,
+) -> str:
+    if not OPENROUTER_API_KEY:
+        logger.warning("OPENROUTER_API_KEY not set - returning empty response.")
+        return ""
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:8000",
+        "X-Title": "Vitality - Women's Health Intelligence",
+    }
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": context_user_message},
+    ]
+    for h in history[-10:]:
+        role = h.get("role", "user")
+        if role not in ("user", "assistant"):
+            role = "user"
+        content = h.get("content", "")
+        if content:
+            messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": new_user_message})
+
+    payload = {
+        "model": MODEL_ID,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "messages": messages,
+    }
+
+    try:
+        resp = requests.post(
+            OPENROUTER_URL, headers=headers, json=payload, timeout=REQUEST_TIMEOUT
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        choices = data.get("choices") or [] if isinstance(data, dict) else []
+        first = choices[0] if choices else {}
+        msg = first.get("message") or first
+        content = msg.get("content") if isinstance(msg, dict) else None
+        if content is None:
+            content = msg.get("text", "")
+        if content is None:
+            content = ""
+        if isinstance(content, str) and content.strip():
+            logger.info("OpenRouter reply received (%d chars)", len(content))
+        elif content == "":
+            logger.warning("OpenRouter 200 but empty content (with history). Body sample: %s", (resp.text or "")[:400])
+        return (content or "").strip() or ""
+    except requests.Timeout:
+        logger.error("OpenRouter request timed out.")
+        return ""
+    except requests.HTTPError as e:
+        if getattr(e.response, "status_code", None) == 401:
+            logger.error("OpenRouter 401: invalid or missing API key. Check OPENROUTER_API_KEY in .env (get one at openrouter.ai/keys)")
+        else:
+            logger.error(f"OpenRouter HTTP error: {e} - {resp.text[:300]}")
         return ""
     except Exception as e:
         logger.error(f"OpenRouter call failed: {e}")
@@ -500,6 +588,7 @@ def handle_virtual_assistant(
     user_message: str,
     vitality_result: Any,
     transcript: Optional[str] = None,
+    history: Optional[List[Dict[str, str]]] = None,
 ) -> str:
     v_data = _extract_vitality_data(vitality_result)
     score = v_data.get("vitality_index", 75)
@@ -508,24 +597,36 @@ def handle_virtual_assistant(
     cycle = v_data.get("cycle_phase", {})
     phase_label = cycle.get("label", "Unknown phase")
 
-    user_prompt = f"Patient's live data ({phase_label}):\n{context}\n"
-
+    context_user = f"Patient's live data ({phase_label}):\n{context}\n"
     if transcript:
-        user_prompt += f"\nLatest voice check-in transcript: \"{transcript}\"\n"
+        context_user += f"\nLatest voice check-in transcript: \"{transcript}\"\n"
+    context_user += "\nUse this context for the conversation. The patient may now send multiple messages; respond to their latest message and reference the conversation when relevant."
 
-    user_prompt += f"\nPatient says: \"{user_message}\""
-
-    raw = _call_openrouter(
-        ASSISTANT_SYSTEM_PROMPT,
-        user_prompt,
-        json_mode=False,
-        temperature=0.6,
-        max_tokens=512,
-    )
+    history_list = history or []
+    if history_list:
+        raw = _call_openrouter_with_history(
+            ASSISTANT_SYSTEM_PROMPT,
+            context_user,
+            history_list,
+            user_message,
+            temperature=0.6,
+            max_tokens=512,
+        )
+    else:
+        user_prompt = context_user + f'\n\nPatient says: "{user_message}"'
+        raw = _call_openrouter(
+            ASSISTANT_SYSTEM_PROMPT,
+            user_prompt,
+            json_mode=False,
+            temperature=0.6,
+            max_tokens=512,
+        )
 
     if not raw:
+        logger.warning("Using fallback response (LLM returned empty). Check logs above for OpenRouter errors.")
         tier = v_data.get("tier_id", "STABLE")
         phase_key = cycle.get("phase", "baseline")
+        snippet = (user_message[:80] + "…") if len(user_message) > 80 else user_message
 
         if tier == "CRITICAL":
             response = (
@@ -549,13 +650,13 @@ def handle_virtual_assistant(
             return (
                 f"Your Vitality Score is at {score}/100 during your {phase_label}. "
                 f"I'm seeing some concerning signals that go beyond what's expected for "
-                f"this cycle phase. I'd recommend reaching out to your care team today."
+                f"this cycle phase. I'd recommend reaching out to your care team today. "
+                f"You mentioned: \"{snippet}\" — your care team can go deeper on that."
             )
         else:
             return (
-                f"Your Vitality Score is currently {score}/100 - looking good for {phase_label}. "
-                f"I'm monitoring your vitals and vocal biomarkers, and everything is within "
-                f"expected ranges for where you are in your cycle. Let me know if you have questions."
+                f"Your Vitality Score is currently {score}/100 for {phase_label}. "
+                f"I'm here to help. Keep logging your symptoms and vitals in the app, and reach out to your care team whenever you have concerns."
             )
 
     return raw

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Send, Bot, User, ArrowUpRight, Loader2 } from 'lucide-react'
 import { chatWithAssistant } from '../../api/client'
+import { getStoredProfile } from '../ProfileSelector'
 
 interface Message {
   id: string
@@ -45,7 +46,11 @@ export default function MessagesView() {
 
     setThinking(true)
     try {
-      const res = await chatWithAssistant(text)
+      const history = messages
+        .filter((m) => m.from === 'patient' || m.from === 'ai')
+        .map((m) => ({ role: m.from === 'patient' ? 'user' : 'assistant', content: m.text }))
+        .slice(-10)
+      const res = await chatWithAssistant(text, getStoredProfile(), history)
       const reply: Message = {
         id: (Date.now() + 1).toString(),
         from: 'ai',

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Pill, Dumbbell, UtensilsCrossed, Check, Brain, Sparkles, Loader2 } from 'lucide-react'
 import { getCoaching } from '../../api/client'
+import { getStoredProfile } from '../ProfileSelector'
 
 interface Task {
   id: string
@@ -32,7 +33,7 @@ export default function WellnessView() {
     const fetchCoachingPlan = async () => {
       try {
         setLoading(true)
-        const data = await getCoaching()
+        const data = await getCoaching(getStoredProfile())
 
         if (data.status === 'success' && data.data) {
           const aiPlan = data.data.coaching_plan || []

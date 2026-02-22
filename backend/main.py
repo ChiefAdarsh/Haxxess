@@ -32,8 +32,11 @@ from services.history import (
     get_week_comparison,
     compute_all_trends,
 )
+from services.symptom_extract import extract_symptoms
 
+_env_dir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(_env_dir), ".env"))
 
 VALID_PROFILES = {
     "follicular",
@@ -49,6 +52,7 @@ VALID_PROFILES = {
 
 class ChatRequest(BaseModel):
     message: str
+    history: Optional[List[Dict[str, str]]] = None
 
 
 # --- Cycle History and Prediction Models ---
@@ -234,6 +238,30 @@ async def analyze_voice(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
+@app.post("/call-triage")
+async def call_triage(file: UploadFile = File(...)):
+    tmp_path = None
+    try:
+        ext = os.path.splitext(file.filename or "")[1] or ".wav"
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+        content = await file.read()
+        tmp.write(content)
+        tmp.close()
+        tmp_path = tmp.name
+        transcript = transcribe(tmp_path)
+        extraction = extract_symptoms(transcript)
+        return {
+            "status": "success",
+            "transcript": transcript,
+            "extraction": extraction,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
@@ -476,6 +504,7 @@ async def chat_with_assistant(req: ChatRequest, profile: Optional[str] = Query(d
             user_message=req.message,
             vitality_result=result,
             transcript=_latest_transcript,
+            history=req.history or [],
         )
         return {"status": "success", "response": reply}
     except Exception as e:

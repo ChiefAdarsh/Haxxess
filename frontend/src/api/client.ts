@@ -36,13 +36,13 @@ export function getCoaching(profile?: string) {
   return request<any>(`/intelligence/coaching${q}`)
 }
 
-// chat with ai assistant
-export function chatWithAssistant(message: string, profile?: string) {
+// chat with ai assistant (history = last N messages as { role, content } for context)
+export function chatWithAssistant(message: string, profile?: string, history?: { role: string; content: string }[]) {
   const q = profile ? `?profile=${profile}` : ''
   return request<any>(`/intelligence/chat${q}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, history: history || [] }),
   })
 }
 

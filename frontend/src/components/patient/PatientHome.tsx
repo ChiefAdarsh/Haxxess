@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useSymptoms } from '../../context/SymptomContext'
-import { getConsolidated, getSmartAlert } from '../../api/client'
-import { Activity, MapPin, Calendar, Shield, AlertTriangle, Loader2 } from 'lucide-react'
+import { getConsolidated, getSmartAlert, getHistoryTrends } from '../../api/client'
+import { getStoredProfile } from '../ProfileSelector'
+import { Activity, MapPin, Calendar, Shield, AlertTriangle, Loader2, TrendingUp } from 'lucide-react'
 import type { BodyRegion } from '../../types'
 
 const regionLabels: Record<BodyRegion, string> = {
@@ -22,16 +23,23 @@ export default function PatientHome() {
 
   const [vitality, setVitality] = useState<any>(null)
   const [alert, setAlert] = useState<any>(null)
+  const [trends, setTrends] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
+    const profile = getStoredProfile()
     async function load() {
       try {
-        const [vRes, aRes] = await Promise.all([getConsolidated(), getSmartAlert()])
+        const [vRes, aRes, tRes] = await Promise.all([
+          getConsolidated(profile),
+          getSmartAlert(profile),
+          getHistoryTrends(profile, 14).catch(() => null),
+        ])
         if (cancelled) return
         setVitality(vRes)
         setAlert(aRes)
+        setTrends(tRes?.trends ?? null)
       } catch {
         // backend may not be running
       } finally {
@@ -82,7 +90,15 @@ export default function PatientHome() {
           <span style={{ fontSize: 13, color: '#9ca3af' }}>connecting to vitality backend...</span>
           <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
         </div>
-      ) : vitality ? (
+      ) : !vitality ? (
+        <div style={{
+          backgroundColor: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0',
+          padding: '24px', marginBottom: 20, textAlign: 'center',
+        }}>
+          <p style={{ fontSize: 14, color: '#64748b', margin: 0 }}>Vitality pipeline offline. Start the backend to see your index and alerts.</p>
+          <p style={{ fontSize: 12, color: '#94a3b8', margin: '8px 0 0' }}>Symptom and cycle data below are still available.</p>
+        </div>
+      ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
           <div style={{
             backgroundColor: '#fff', borderRadius: 12, border: '1px solid #e5e7eb',
@@ -142,7 +158,7 @@ export default function PatientHome() {
             </div>
           )}
         </div>
-      ) : null}
+      )}
 
       {/* stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 20 }}>
@@ -191,7 +207,28 @@ export default function PatientHome() {
         </div>
       </div>
 
-      {/* region heatmap summary (FROM TEAMMATE) */}
+      {trends && typeof trends === 'object' && Object.keys(trends).length > 0 && (
+        <div style={{
+          backgroundColor: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: '20px', marginBottom: 20,
+        }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <TrendingUp size={16} color="#be185d" /> Vitality trend (14d)
+          </h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {trends.vitality_index?.description && (
+              <span style={{ padding: '6px 12px', borderRadius: 8, backgroundColor: '#fdf2f8', border: '1px solid #fbcfe8', fontSize: 12, color: '#be185d', fontWeight: 600 }}>
+                Index: {trends.vitality_index.description}
+              </span>
+            )}
+            {['sleep_score', 'hrv', 'stress'].filter((k) => trends[k]?.description).map((k) => (
+              <span key={k} style={{ padding: '6px 12px', borderRadius: 8, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', fontSize: 12, color: '#475569' }}>
+                {k.replace('_', ' ')}: {trends[k].description}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{
         backgroundColor: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: '20px',
       }}>

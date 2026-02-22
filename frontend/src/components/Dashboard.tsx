@@ -10,6 +10,10 @@ import PatientCycle from './patient/PatientCycle'
 import BodyMap from './patient/BodyMap'
 import SymptomHistory from './patient/SymptomHistory'
 import CallIn from './patient/CallIn'
+import MessagesView from './patient/MessagesView'
+import VitalsView from './patient/VitalsView'
+import WellnessView from './patient/WellnessView'
+import CasesView from './clinician/CasesView'
 import { patientTabs, clinicianTabs } from '../config/tabs'
 import type { Patient } from '../config/patients'
 import { Sparkles } from 'lucide-react'
@@ -65,6 +69,9 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
   const renderContent = () => {
     if (role === 'patient') {
       if (active === 'home') return <PatientHome />
+      if (active === 'messages') return <MessagesView />
+      if (active === 'vitals') return <VitalsView />
+      if (active === 'wellness') return <WellnessView />
       if (active === 'bodymap') return <BodyMap />
       if (active === 'history') return <SymptomHistory />
       if (active === 'tracker') return <PatientTracker />
@@ -78,6 +85,7 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
         return <PatientDetail patient={selectedPatient} onBack={() => setSelectedPatient(null)} />
       }
       if (active === 'patients') return <PatientList onSelectPatient={setSelectedPatient} />
+      if (active === 'cases') return <CasesView onSelectPatient={handleSelectPatient} />
       if (active === 'alerts') return <AlertsView />
     }
     return <Placeholder label={current?.label || ''} />
