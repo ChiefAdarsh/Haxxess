@@ -1,6 +1,7 @@
+import { useState, useEffect, useRef } from 'react'
 import { useSymptoms } from '../../context/SymptomContext'
 import { triageSymptoms, triageLevelConfig } from '../../engine/triage'
-import { AlertTriangle, Activity, MapPin, Calendar } from 'lucide-react'
+import { AlertTriangle, Activity, MapPin, Calendar, Mic, Square, Loader2 } from 'lucide-react'
 import type { BodyRegion } from '../../types'
 
 const regionLabels: Record<BodyRegion, string> = {
@@ -15,6 +16,7 @@ const regionLabels: Record<BodyRegion, string> = {
 }
 
 export default function PatientHome() {
+  // @ts-ignore
   const { symptoms, getRecent, maxSeverityByRegion } = useSymptoms()
   const recent7 = getRecent(7)
   const recent24 = getRecent(1)
@@ -29,11 +31,142 @@ export default function PatientHome() {
   }
   const topRegion = Object.entries(regionCounts).sort((a, b) => b[1] - a[1])[0]
 
+  // --- OUR NEW BACKEND STATE ---
+  const [healthScore, setHealthScore] = useState<number | null>(null)
+  const [tierLabel, setTierLabel] = useState<string>("Loading...")
+  const [isRecording, setIsRecording] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [transcript, setTranscript] = useState<string | null>(null)
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+
+  const fetchScore = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/consolidated')
+      const data = await res.json()
+      if (data.status === 'success') {
+        setHealthScore(Math.round(data.vitality_index))
+        setTierLabel(data.tier.label)
+      }
+    } catch (err) {
+      console.error("Failed to fetch score", err)
+    }
+  }
+
+  useEffect(() => {
+    fetchScore()
+  }, [])
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      mediaRecorder.start()
+      setIsRecording(true)
+    } catch (err) {
+      console.error("Microphone access denied", err)
+      alert("Please allow microphone access to record your voice journal.")
+    }
+  }
+
+  const stopRecording = () => {
+    if (!mediaRecorderRef.current) return
+
+    mediaRecorderRef.current.onstop = async () => {
+      setIsRecording(false)
+      setIsAnalyzing(true)
+
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
+      const formData = new FormData()
+      formData.append('file', audioBlob, 'journal.wav')
+
+      try {
+        const res = await fetch('http://localhost:8000/analyze', {
+          method: 'POST',
+          body: formData,
+        })
+        const data = await res.json()
+
+        if (data.status === 'success') {
+          setTranscript(data.transcript)
+          await fetchScore() // Refresh the score with the new vocal biomarkers
+        }
+      } catch (err) {
+        console.error("Failed to analyze audio", err)
+      } finally {
+        setIsAnalyzing(false)
+      }
+    }
+
+    mediaRecorderRef.current.stop()
+    mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop())
+  }
+
   return (
     <div>
-      <h2 style={{ fontSize: 18, fontWeight: 600, color: '#1f2937', margin: '0 0 20px' }}>Overview</h2>
+      <h2 style={{ fontSize: 18, fontWeight: 600, color: '#1f2937', margin: '0 0 20px' }}>Patient Dashboard</h2>
 
-      {/* triage status */}
+      {/* Voice Journal Section (OUR NEW BACKEND FEATURE) */}
+      <div style={{ backgroundColor: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1f2937', margin: 0 }}>Daily Vocal Biomarker Check-in</h3>
+          <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0', maxWidth: 400 }}>
+            Hold the button and describe your hormonal symptoms today. Vitality will analyze your vocal folds and transcribe your entry.
+          </p>
+
+          {healthScore !== null && (
+            <div style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '4px 10px', backgroundColor: '#f3f4f6', borderRadius: 20 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#4b5563' }}>Fused Vitality Score:</span>
+              <span style={{
+                fontSize: 14, fontWeight: 700,
+                color: healthScore >= 80 ? '#10b981' : healthScore >= 55 ? '#f59e0b' : '#dc2626'
+              }}>
+                {healthScore}/100
+              </span>
+              <span style={{ fontSize: 11, color: '#9ca3af', textTransform: 'uppercase' }}>({tierLabel})</span>
+            </div>
+          )}
+        </div>
+
+        <button
+          onMouseDown={startRecording}
+          onMouseUp={stopRecording}
+          onTouchStart={startRecording}
+          onTouchEnd={stopRecording}
+          disabled={isAnalyzing}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px',
+            borderRadius: 30, border: 'none', cursor: isAnalyzing ? 'not-allowed' : 'pointer',
+            backgroundColor: isRecording ? '#dc2626' : '#ec4899', // Pinkish theme for FemTech
+            color: '#fff', fontSize: 14, fontWeight: 600,
+            boxShadow: isRecording ? '0 0 0 4px rgba(220, 38, 38, 0.2)' : 'none',
+            transition: 'all 0.2s', flexShrink: 0
+          }}
+        >
+          {isAnalyzing ? <Loader2 size={18} className="animate-spin" /> : isRecording ? <Square size={18} fill="#fff" /> : <Mic size={18} />}
+          {isAnalyzing ? "Analyzing..." : isRecording ? "Release to Send" : "Hold to Record"}
+        </button>
+      </div>
+
+      {/* Transcript Result */}
+      {transcript && (
+        <div style={{ padding: 16, backgroundColor: '#fdf2f8', borderRadius: 12, border: '1px solid #fbcfe8', marginBottom: 20 }}>
+          <p style={{ fontSize: 12, fontWeight: 600, color: '#be185d', margin: '0 0 8px', textTransform: 'uppercase' }}>Transcript Logged</p>
+          <p style={{ fontSize: 14, color: '#831843', margin: 0, fontStyle: 'italic' }}>"{transcript}"</p>
+        </div>
+      )}
+
+      {/* triage status (FROM TEAMMATE) */}
       <div style={{
         backgroundColor: cfg.bg, borderRadius: 12, border: `1px solid ${cfg.color}30`,
         padding: '20px', marginBottom: 20, display: 'flex', alignItems: 'flex-start', gap: 14,
@@ -47,7 +180,7 @@ export default function PatientHome() {
         </div>
       </div>
 
-      {/* stat cards */}
+      {/* stat cards (FROM TEAMMATE) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 20 }}>
         <div style={{
           backgroundColor: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: '18px',
@@ -90,7 +223,7 @@ export default function PatientHome() {
         </div>
       </div>
 
-      {/* region heatmap summary */}
+      {/* region heatmap summary (FROM TEAMMATE) */}
       <div style={{
         backgroundColor: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: '20px',
       }}>

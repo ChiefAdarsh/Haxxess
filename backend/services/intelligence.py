@@ -27,7 +27,7 @@ def _call_openrouter(
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
         "HTTP-Referer": "http://localhost:8000",
-        "X-Title": "Aura - Women's Health Intelligence",
+        "X-Title": "Vitality - Women's Health Intelligence",
     }
 
     payload = {
@@ -464,7 +464,7 @@ def generate_lifestyle_coaching(vitality_result: Any) -> dict:
 
 
 ASSISTANT_SYSTEM_PROMPT = """\
-You are Aura - an empathetic, clinically-informed AI health companion specializing in \
+You are Vitality - an empathetic, clinically-informed AI health companion specializing in \
 women's hormonal health. You have real-time access to the patient's wearable biometrics \
 (Apple Watch, Oura Ring, Dexcom G7 CGM), acoustic vocal biomarkers (pitch, jitter, \
 shimmer, energy, speech rate, emotional valence), hormonal vocal markers (vocal fold \
@@ -562,7 +562,7 @@ def handle_virtual_assistant(
 
 
 ALERT_SYSTEM_PROMPT = """\
-You are a clinical alert composer for a women's health monitoring platform (Aura). \
+You are a clinical alert composer for a women's health monitoring platform (Vitality). \
 Given a patient's health flags, cycle phase, and biometric data, generate a brief, \
 actionable alert message suitable for sending to their gynecologist, care team, or \
 designated support person via SMS/push notification.
@@ -610,7 +610,7 @@ def generate_smart_alert(vitality_result: Any) -> dict:
 
     top_flag = flags[0] if flags else "Multiple health flags detected"
 
-    fallback_msg = f"[Aura {phase_label}] Vitality {score}/100. {top_flag}. Please check in."
+    fallback_msg = f"[Vitality {phase_label}] Vitality {score}/100. {top_flag}. Please check in."
     if len(fallback_msg) > 280:
         fallback_msg = fallback_msg[:277] + "..."
 

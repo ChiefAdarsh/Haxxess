@@ -9,6 +9,7 @@ import BodyMap from './patient/BodyMap'
 import SymptomHistory from './patient/SymptomHistory'
 import { patientTabs, clinicianTabs } from '../config/tabs'
 import type { Patient } from '../config/patients'
+import { Sparkles } from 'lucide-react'
 
 interface DashboardProps {
   role: 'patient' | 'clinician'
@@ -18,10 +19,11 @@ interface DashboardProps {
 function Placeholder({ label }: { label: string }) {
   return (
     <div style={{
-      border: '2px dashed #e5e7eb', borderRadius: 12, backgroundColor: '#fff',
-      padding: '80px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      border: '2px dashed #fbcfe8', borderRadius: 16, backgroundColor: '#fdf2f8',
+      padding: '80px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
     }}>
-      <p style={{ color: '#9ca3af', fontSize: 14 }}>{label} content goes here</p>
+      <Sparkles color="#ec4899" size={24} style={{ marginBottom: 12, opacity: 0.5 }} />
+      <p style={{ color: '#be185d', fontSize: 14, fontWeight: 500 }}>{label} is under development</p>
     </div>
   )
 }
@@ -64,7 +66,12 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
     : current?.label
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{
+      display: 'flex',
+      height: '100vh',
+      fontFamily: '"Inter", system-ui, sans-serif',
+      backgroundColor: '#fdfa', // Very soft off-white base
+    }}>
       <Sidebar
         role={role}
         tabs={tabs}
@@ -73,26 +80,87 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
         onLogout={onLogout}
       />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#f9fafb' }}>
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: '#f8fafc',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+
+        {/* Decorative Background Blob for modern feel */}
+        <div style={{
+          position: 'absolute', top: -150, right: -150, width: 400, height: 400,
+          background: 'radial-gradient(circle, rgba(236,72,153,0.1) 0%, rgba(248,250,252,0) 70%)',
+          borderRadius: '50%', pointerEvents: 'none', zIndex: 0
+        }} />
+
+        {/* Premium Header */}
         <header style={{
-          backgroundColor: '#dc2626', color: '#fff',
-          padding: '16px 24px', fontSize: 16, fontWeight: 600,
+          background: 'linear-gradient(135deg, #be185d 0%, #db2777 100%)', // Premium Rose/Pink gradient
+          color: '#fff',
+          padding: '20px 28px',
+          fontSize: 18,
+          fontWeight: 600,
+          letterSpacing: '-0.01em',
+          boxShadow: '0 4px 6px -1px rgba(190, 24, 93, 0.1), 0 2px 4px -1px rgba(190, 24, 93, 0.06)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          zIndex: 10
         }}>
-          {headerLabel}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {role === 'patient' && <Sparkles size={20} color="#fbcfe8" />}
+            {headerLabel}
+          </div>
+
+          {/* Subtle profile indicator on the right */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 13, color: '#fbcfe8', fontWeight: 500 }}>
+              {role === 'clinician' ? 'Dr. Sarah Mitchell' : 'Vitality Patient Portal'}
+            </span>
+            <div style={{
+              width: 32, height: 32, borderRadius: 16, backgroundColor: '#fdf2f8',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#be185d', fontSize: 14, fontWeight: 700
+            }}>
+              {role === 'clinician' ? 'SM' : 'JD'}
+            </div>
+          </div>
         </header>
 
-        <main style={{ flex: 1, padding: 24, overflow: 'auto' }}>
-          {renderContent()}
+        {/* Main Content Area */}
+        <main style={{
+          flex: 1,
+          padding: '28px 32px',
+          overflow: 'auto',
+          zIndex: 10
+        }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+            {renderContent()}
+          </div>
         </main>
 
+        {/* Legal Footer (Softened) */}
         <footer style={{
-          padding: '10px 24px', borderTop: '1px solid #e5e7eb',
-          backgroundColor: '#fff', display: 'flex', justifyContent: 'center', gap: 20,
-          fontSize: 11, color: '#9ca3af',
+          padding: '12px 24px',
+          borderTop: '1px solid #f1f5f9',
+          backgroundColor: '#fff',
+          display: 'flex',
+          justifyContent: 'center',
+          gap: 20,
+          fontSize: 11,
+          color: '#94a3b8',
+          letterSpacing: '0.02em',
+          zIndex: 10
         }}>
-          <span>not for emergencies — call 911 for emergency symptoms</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#dc2626' }} />
+            Not for emergencies — call 911 for severe symptoms
+          </span>
           <span>•</span>
-          <span>triage suggestions are informational; clinician makes final decision</span>
+          <span>AI triage suggestions are informational; clinician review required</span>
         </footer>
       </div>
     </div>

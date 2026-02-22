@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import type { SymptomEntry, BodyRegion } from '../types'
 
 // seed data so the demo isn't empty
@@ -41,12 +41,29 @@ interface SymptomContextValue {
   getByRegion: (region: BodyRegion) => SymptomEntry[]
   getRecent: (days: number) => SymptomEntry[]
   maxSeverityByRegion: () => Partial<Record<BodyRegion, number>>
+  clearHistory: () => void // Added this so you can reset during the demo if needed
 }
 
 const SymptomContext = createContext<SymptomContextValue | null>(null)
 
 export function SymptomProvider({ children }: { children: ReactNode }) {
-  const [symptoms, setSymptoms] = useState<SymptomEntry[]>(seedData)
+  // Initialize state from localStorage, fallback to seedData if nothing is saved
+  const [symptoms, setSymptoms] = useState<SymptomEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem('vitality_symptoms')
+      if (saved) {
+        return JSON.parse(saved)
+      }
+    } catch (e) {
+      console.error("Failed to load symptoms from localStorage", e)
+    }
+    return seedData
+  })
+
+  // Sync to localStorage whenever symptoms change
+  useEffect(() => {
+    localStorage.setItem('vitality_symptoms', JSON.stringify(symptoms))
+  }, [symptoms])
 
   const addSymptom = (entry: Omit<SymptomEntry, 'id' | 'timestamp'>) => {
     const newEntry: SymptomEntry = {
@@ -54,6 +71,7 @@ export function SymptomProvider({ children }: { children: ReactNode }) {
       id: `s${Date.now()}`,
       timestamp: new Date().toISOString(),
     }
+    // Prepend to array so newest is first
     setSymptoms((prev) => [newEntry, ...prev])
   }
 
@@ -77,8 +95,12 @@ export function SymptomProvider({ children }: { children: ReactNode }) {
     return map
   }
 
+  const clearHistory = () => {
+    setSymptoms(seedData) // Resets to baseline for the next judge presentation
+  }
+
   return (
-    <SymptomContext.Provider value={{ symptoms, addSymptom, getByRegion, getRecent, maxSeverityByRegion }}>
+    <SymptomContext.Provider value={{ symptoms, addSymptom, getByRegion, getRecent, maxSeverityByRegion, clearHistory }}>
       {children}
     </SymptomContext.Provider>
   )
