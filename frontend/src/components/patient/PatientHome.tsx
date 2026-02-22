@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react'
 import { useSymptoms } from '../../context/SymptomContext'
-import { Activity, MapPin, Calendar } from 'lucide-react'
+import { getConsolidated, getSmartAlert } from '../../api/client'
+import { Activity, MapPin, Calendar, Shield, AlertTriangle, Loader2 } from 'lucide-react'
 import type { BodyRegion } from '../../types'
 
 const regionLabels: Record<BodyRegion, string> = {
@@ -14,10 +16,31 @@ const regionLabels: Record<BodyRegion, string> = {
 }
 
 export default function PatientHome() {
-  // @ts-ignore
-  const { symptoms, getRecent, maxSeverityByRegion } = useSymptoms()
+  const { getRecent, maxSeverityByRegion } = useSymptoms()
   const recent7 = getRecent(7)
   const severityMap = maxSeverityByRegion()
+
+  const [vitality, setVitality] = useState<any>(null)
+  const [alert, setAlert] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const [vRes, aRes] = await Promise.all([getConsolidated(), getSmartAlert()])
+        if (cancelled) return
+        setVitality(vRes)
+        setAlert(aRes)
+      } catch {
+        // backend may not be running
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
 
   // most affected region
   const regionCounts: Partial<Record<BodyRegion, number>> = {}
@@ -49,7 +72,79 @@ export default function PatientHome() {
     <div>
       <h2 style={{ fontSize: 18, fontWeight: 600, color: '#1f2937', margin: '0 0 20px' }}>Patient Dashboard</h2>
 
-      {/* stat cards (FROM TEAMMATE) */}
+      {/* vitality index + alert from backend */}
+      {loading ? (
+        <div style={{
+          backgroundColor: '#fff', borderRadius: 12, border: '1px solid #e5e7eb',
+          padding: '24px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+        }}>
+          <Loader2 size={18} color="#9ca3af" style={{ animation: 'spin 1s linear infinite' }} />
+          <span style={{ fontSize: 13, color: '#9ca3af' }}>connecting to vitality backend...</span>
+          <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+        </div>
+      ) : vitality ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+          <div style={{
+            backgroundColor: '#fff', borderRadius: 12, border: '1px solid #e5e7eb',
+            padding: '20px', display: 'flex', alignItems: 'center', gap: 16,
+          }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 28,
+              background: `conic-gradient(${vitality.vitality_index >= 60 ? '#10b981' : vitality.vitality_index >= 35 ? '#f59e0b' : '#dc2626'} ${vitality.vitality_index}%, #f3f4f6 0)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: 18, color: '#1f2937',
+              }}>
+                {vitality.vitality_index}
+              </div>
+            </div>
+            <div>
+              <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>vitality index</p>
+              <p style={{ fontSize: 16, fontWeight: 600, color: '#1f2937', margin: '2px 0 0' }}>
+                {vitality.tier?.label || 'Unknown'}
+              </p>
+              <p style={{ fontSize: 11, color: '#6b7280', margin: '2px 0 0' }}>
+                {vitality.tier?.action || ''}
+              </p>
+            </div>
+          </div>
+
+          {alert?.data ? (
+            <div style={{
+              backgroundColor: alert.data.severity === 'critical' ? '#fef2f2' : '#fffbeb',
+              borderRadius: 12,
+              border: `1px solid ${alert.data.severity === 'critical' ? '#fecaca' : '#fde68a'}`,
+              padding: '20px', display: 'flex', alignItems: 'flex-start', gap: 12,
+            }}>
+              <AlertTriangle size={20} color={alert.data.severity === 'critical' ? '#dc2626' : '#f59e0b'} style={{ marginTop: 2, flexShrink: 0 }} />
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', margin: '0 0 4px' }}>
+                  {alert.data.title || 'Alert'}
+                </p>
+                <p style={{ fontSize: 12, color: '#4b5563', margin: 0, lineHeight: 1.4 }}>
+                  {alert.data.message || alert.data.summary || 'check your vitals'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              backgroundColor: '#f0fdf4', borderRadius: 12, border: '1px solid #bbf7d0',
+              padding: '20px', display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              <Shield size={20} color="#10b981" />
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#15803d', margin: 0 }}>all clear</p>
+                <p style={{ fontSize: 12, color: '#4b5563', margin: '2px 0 0' }}>no active alerts</p>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {/* stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 20 }}>
         <div style={{
           backgroundColor: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: '18px',

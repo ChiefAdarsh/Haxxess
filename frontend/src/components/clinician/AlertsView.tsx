@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Phone, Check, Activity, Droplets, Thermometer, BrainCircuit, Sparkles } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Phone, Check, Activity, Droplets, Thermometer, BrainCircuit, Sparkles, Wifi, WifiOff } from 'lucide-react'
 import { patients } from '../../config/patients'
 import { triageLevelConfig } from '../../engine/triage'
+import { getSmartAlert } from '../../api/client'
 import type { TriageLevel } from '../../types'
 
 interface Alert {
@@ -32,6 +33,35 @@ const iconMap = {
 
 export default function AlertsView() {
   const [alerts, setAlerts] = useState(initialAlerts)
+  const [backendConnected, setBackendConnected] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    async function fetchLiveAlert() {
+      try {
+        const res = await getSmartAlert()
+        if (cancelled || !res?.data) return
+        setBackendConnected(true)
+        const existing = alerts.find((a) => a.id === 'live-backend')
+        if (!existing && res.data.title) {
+          const liveAlert: Alert = {
+            id: 'live-backend',
+            patient: patients[0],
+            message: `${res.data.title}: ${res.data.message || res.data.summary || ''}`,
+            level: res.data.severity === 'critical' ? 'emergency' : 'same_day',
+            icon: 'vitals',
+            time: 'just now',
+            acknowledged: false,
+          }
+          setAlerts((prev) => [liveAlert, ...prev])
+        }
+      } catch {
+        if (!cancelled) setBackendConnected(false)
+      }
+    }
+    fetchLiveAlert()
+    return () => { cancelled = true }
+  }, [])
 
   const acknowledge = (id: string) => {
     setAlerts(alerts.map((a) => a.id === id ? { ...a, acknowledged: true } : a))
@@ -59,6 +89,16 @@ export default function AlertsView() {
           <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0', fontWeight: 500 }}>
             Continuous telemetry and AI triage notifications
           </p>
+        </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8,
+          backgroundColor: backendConnected ? '#f0fdf4' : '#f8fafc',
+          border: `1px solid ${backendConnected ? '#bbf7d0' : '#e2e8f0'}`,
+        }}>
+          {backendConnected ? <Wifi size={12} color="#10b981" /> : <WifiOff size={12} color="#94a3b8" />}
+          <span style={{ fontSize: 11, fontWeight: 600, color: backendConnected ? '#15803d' : '#94a3b8' }}>
+            {backendConnected ? 'Live Feed' : 'Mock Data'}
+          </span>
         </div>
       </div>
 

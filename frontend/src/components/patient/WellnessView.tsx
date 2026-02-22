@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Pill, Dumbbell, UtensilsCrossed, Check, Brain, Sparkles, Loader2 } from 'lucide-react'
+import { getCoaching } from '../../api/client'
 
 interface Task {
   id: string
@@ -31,9 +32,7 @@ export default function WellnessView() {
     const fetchCoachingPlan = async () => {
       try {
         setLoading(true)
-        // Hit your new Intelligence Engine
-        const res = await fetch('http://localhost:8000/intelligence/coaching')
-        const data = await res.json()
+        const data = await getCoaching()
 
         if (data.status === 'success' && data.data) {
           const aiPlan = data.data.coaching_plan || []

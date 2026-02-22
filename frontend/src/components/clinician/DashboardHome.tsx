@@ -1,6 +1,8 @@
-import { AlertTriangle, Users, Clock, Activity, Sparkles } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { AlertTriangle, Users, Clock, Activity, Sparkles, Wifi, WifiOff } from 'lucide-react'
 import { triageLevelConfig } from '../../engine/triage'
 import { patients } from '../../config/patients'
+import { getStatus, getSmartAlert } from '../../api/client'
 import type { Patient } from '../../config/patients'
 import type { TriageLevel } from '../../types'
 
@@ -50,6 +52,26 @@ interface DashboardHomeProps {
 }
 
 export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
+  const [backendStatus, setBackendStatus] = useState<'connecting' | 'online' | 'offline'>('connecting')
+  const [liveAlert, setLiveAlert] = useState<any>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function check() {
+      try {
+        const [status, alert] = await Promise.all([getStatus(), getSmartAlert()])
+        if (cancelled) return
+        setBackendStatus('online')
+        setLiveAlert(alert?.data || null)
+      } catch {
+        if (!cancelled) setBackendStatus('offline')
+      }
+    }
+    check()
+    const interval = setInterval(check, 30000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [])
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -61,7 +83,43 @@ export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
             Vitality has flagged {triageCases.filter(c => c.level === 'emergency').length} critical cases requiring your attention.
           </p>
         </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 14px', borderRadius: 10,
+          backgroundColor: backendStatus === 'online' ? '#f0fdf4' : backendStatus === 'offline' ? '#fef2f2' : '#f8fafc',
+          border: `1px solid ${backendStatus === 'online' ? '#bbf7d0' : backendStatus === 'offline' ? '#fecaca' : '#e2e8f0'}`,
+        }}>
+          {backendStatus === 'online'
+            ? <Wifi size={14} color="#10b981" />
+            : <WifiOff size={14} color={backendStatus === 'offline' ? '#ef4444' : '#94a3b8'} />
+          }
+          <span style={{
+            fontSize: 12, fontWeight: 600,
+            color: backendStatus === 'online' ? '#15803d' : backendStatus === 'offline' ? '#991b1b' : '#64748b',
+          }}>
+            {backendStatus === 'online' ? 'Backend Live' : backendStatus === 'offline' ? 'Backend Offline' : 'Connecting...'}
+          </span>
+        </div>
       </div>
+
+      {liveAlert && (
+        <div style={{
+          padding: '14px 20px', borderRadius: 12, marginBottom: 20,
+          backgroundColor: liveAlert.severity === 'critical' ? '#fef2f2' : '#fffbeb',
+          border: `1px solid ${liveAlert.severity === 'critical' ? '#fecaca' : '#fde68a'}`,
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <AlertTriangle size={18} color={liveAlert.severity === 'critical' ? '#dc2626' : '#f59e0b'} />
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{liveAlert.title || 'AI Alert'}</span>
+            <span style={{ fontSize: 12, color: '#64748b', marginLeft: 10 }}>{liveAlert.message || liveAlert.summary || ''}</span>
+          </div>
+          <span style={{
+            fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 4,
+            backgroundColor: '#be185d', color: '#fff', textTransform: 'uppercase',
+          }}>live</span>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20, marginBottom: 32 }}>
         {stats.map((s) => {

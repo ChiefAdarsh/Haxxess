@@ -19,10 +19,7 @@ type CyclePredictions = {
   ovulation_date: string | null
 }
 
-const API_BASE =
-  (import.meta as any)?.env?.VITE_API_URL ||
-  (import.meta as any)?.env?.VITE_API_BASE_URL ||
-  'http://localhost:8000'
+import { getCyclePeriods, addCyclePeriod } from '../../api/client'
 
 const LS_KEY = 'vitality_cycle_periods_v2'
 
@@ -69,22 +66,18 @@ export default function PatientCycle() {
       setLoading(true)
       setError(null)
 
-      // Backend first
       try {
-        const res = await fetch(`${API_BASE}/cycle/periods`)
-        if (res.ok) {
-          const data = await res.json()
-          if (!cancelled && data?.status === 'success') {
-            setPeriods(data.periods || [])
-            setStats(data.stats || stats)
-            setPreds(data.predictions || preds)
-            localStorage.setItem(LS_KEY, JSON.stringify({ periods: data.periods || [] }))
-            setLoading(false)
-            return
-          }
+        const data = await getCyclePeriods()
+        if (!cancelled && data?.status === 'success') {
+          setPeriods(data.periods || [])
+          setStats(data.stats || stats)
+          setPreds(data.predictions || preds)
+          localStorage.setItem(LS_KEY, JSON.stringify({ periods: data.periods || [] }))
+          setLoading(false)
+          return
         }
       } catch {
-        // ignore; fallback
+        // backend unavailable; fallback to local
       }
 
       // local fallback
@@ -176,21 +169,12 @@ export default function PatientCycle() {
     localStorage.setItem(LS_KEY, JSON.stringify({ periods: optimistic }))
 
     try {
-      const res = await fetch(`${API_BASE}/cycle/periods`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(draft),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        if (data?.status === 'success') {
-          setPeriods(data.periods || optimistic)
-          setStats(data.stats || stats)
-          setPreds(data.predictions || preds)
-          localStorage.setItem(LS_KEY, JSON.stringify({ periods: data.periods || optimistic }))
-        }
-      } else {
-        setError('Saved locally — backend rejected this entry')
+      const data = await addCyclePeriod(draft)
+      if (data?.status === 'success') {
+        setPeriods(data.periods || optimistic)
+        setStats(data.stats || stats)
+        setPreds(data.predictions || preds)
+        localStorage.setItem(LS_KEY, JSON.stringify({ periods: data.periods || optimistic }))
       }
     } catch {
       setError('Saved locally — backend unavailable')

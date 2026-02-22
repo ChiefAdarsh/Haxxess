@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Heart, Droplets, TrendingUp, TrendingDown, Minus, Thermometer } from 'lucide-react'
+import { WEARABLE_WS_URL } from '../../api/client'
 
 // Keep the initial history arrays so the charts have a baseline to start from
 const initialHistory = {
@@ -52,7 +53,7 @@ export default function VitalsView() {
 
   // Connect to the Python FastAPI WebSocket for live Wearable/FemTech data
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8000/ws/wearable')
+    const ws = new WebSocket(WEARABLE_WS_URL)
 
     ws.onopen = () => setLiveData(prev => ({ ...prev, status: 'connected' }))
 

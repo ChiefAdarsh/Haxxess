@@ -9,6 +9,7 @@ import PatientTracker from './patient/PatientTracker'
 import PatientCycle from './patient/PatientCycle'
 import BodyMap from './patient/BodyMap'
 import SymptomHistory from './patient/SymptomHistory'
+import CallIn from './patient/CallIn'
 import { patientTabs, clinicianTabs } from '../config/tabs'
 import type { Patient } from '../config/patients'
 import { Sparkles } from 'lucide-react'
@@ -68,6 +69,7 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
       if (active === 'history') return <SymptomHistory />
       if (active === 'tracker') return <PatientTracker />
       if (active === 'cycle') return <PatientCycle />
+      if (active === 'callin') return <CallIn />
       return <Placeholder label={current?.label || ''} />
     }
     if (role === 'clinician') {

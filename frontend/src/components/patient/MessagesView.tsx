@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Send, Bot, User, ArrowUpRight } from 'lucide-react'
+import { Send, Bot, User, ArrowUpRight, Loader2 } from 'lucide-react'
+import { chatWithAssistant } from '../../api/client'
 
 interface Message {
   id: string
@@ -12,39 +13,57 @@ const initialMessages: Message[] = [
   { id: '1', from: 'ai', text: "Hi! I'm your Vitality health assistant. How can I help you today?", time: '10:00 AM' },
 ]
 
-const aiResponses: Record<string, string> = {
-  headache: "I see you're experiencing a headache. How long has it been going on, and would you rate the pain from 1-10? If it's been more than 3 days or above a 7, I'd recommend escalating to Dr. Mitchell.",
-  tired: "Fatigue can have many causes. Looking at your recent vitals, your sleep has averaged 5.2 hours this week — below the recommended 7-8 hours. I'd suggest improving your sleep routine first. Want me to update your wellness plan?",
-  medication: "I can see your current medications in your profile. If you're experiencing side effects or want to discuss changes, I'd recommend messaging Dr. Mitchell directly. Want me to escalate this?",
-}
-
-const defaultResponse = "Thanks for sharing that. Based on what you've described, I'd recommend discussing this with Dr. Mitchell for a more thorough evaluation. Would you like me to escalate this conversation to your doctor?"
-
 export default function MessagesView() {
   const [messages, setMessages] = useState(initialMessages)
   const [input, setInput] = useState('')
   const [escalated, setEscalated] = useState(false)
+  const [thinking, setThinking] = useState(false)
 
-  const sendMessage = () => {
-    if (!input.trim()) return
+  const sendMessage = async () => {
+    if (!input.trim() || thinking) return
+    const text = input
+    setInput('')
+
     const userMsg: Message = {
       id: Date.now().toString(),
       from: 'patient',
-      text: input,
+      text,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
-    const lower = input.toLowerCase()
-    const matched = Object.keys(aiResponses).find((k) => lower.includes(k))
-    const reply: Message = {
-      id: (Date.now() + 1).toString(),
-      from: escalated ? 'doctor' : 'ai',
-      text: escalated
-        ? "Thanks for reaching out. I've reviewed your message. Let's schedule a quick call to discuss. — Dr. Mitchell"
-        : (matched ? aiResponses[matched] : defaultResponse),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    setMessages((prev) => [...prev, userMsg])
+
+    if (escalated) {
+      const reply: Message = {
+        id: (Date.now() + 1).toString(),
+        from: 'doctor',
+        text: "Thanks for reaching out. I've reviewed your message. Let's schedule a quick call to discuss. — Dr. Mitchell",
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }
+      setMessages((prev) => [...prev, reply])
+      return
     }
-    setMessages([...messages, userMsg, reply])
-    setInput('')
+
+    setThinking(true)
+    try {
+      const res = await chatWithAssistant(text)
+      const reply: Message = {
+        id: (Date.now() + 1).toString(),
+        from: 'ai',
+        text: res.response || res.message || 'I had trouble processing that. Could you try again?',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }
+      setMessages((prev) => [...prev, reply])
+    } catch {
+      const reply: Message = {
+        id: (Date.now() + 1).toString(),
+        from: 'ai',
+        text: "I'm having trouble connecting to the server right now. Please try again in a moment.",
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }
+      setMessages((prev) => [...prev, reply])
+    } finally {
+      setThinking(false)
+    }
   }
 
   const escalate = () => {
@@ -135,6 +154,24 @@ export default function MessagesView() {
             </div>
           )
         })}
+        {thinking && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: 15, backgroundColor: '#f3f4f6',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Bot size={14} color="#6b7280" />
+            </div>
+            <div style={{
+              padding: '10px 14px', borderRadius: 12, backgroundColor: '#f3f4f6',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <Loader2 size={14} color="#9ca3af" style={{ animation: 'spin 1s linear infinite' }} />
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>thinking...</span>
+              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{

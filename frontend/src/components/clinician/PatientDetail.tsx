@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Phone, FlaskConical, FileText, Calendar, BrainCircuit, Activity, AlertTriangle } from 'lucide-react'
+import { getConsolidated, getForecast } from '../../api/client'
 import type { Patient } from '../../config/patients'
 
 const urgencyColor = {
@@ -39,16 +40,11 @@ export default function PatientDetail({ patient, onBack }: PatientDetailProps) {
     const fetchData = async () => {
       try {
         setLoading(true)
-        // Fetch both the live sensor fusion and the 72-hour LLM forecast
-        const [vitRes, foreRes] = await Promise.all([
-          fetch('http://localhost:8000/consolidated').then(r => r.json()),
-          fetch('http://localhost:8000/intelligence/forecast').then(r => r.json())
-        ])
-
-        if (vitRes.status === 'success') setLiveData(vitRes)
-        if (foreRes.status === 'success') setForecastData(foreRes.data)
-      } catch (err) {
-        console.error("Failed to fetch patient intelligence data", err)
+        const [vitRes, foreRes] = await Promise.all([getConsolidated(), getForecast()])
+        if (vitRes) setLiveData(vitRes)
+        if (foreRes?.data) setForecastData(foreRes.data)
+      } catch {
+        // backend may not be running
       } finally {
         setLoading(false)
       }
