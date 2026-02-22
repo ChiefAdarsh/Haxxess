@@ -103,5 +103,6 @@ export function getHistoryTrends(profile?: string, days = 30) {
   return request<any>(`/history/trends?${params}`);
 }
 
-// wearable websocket url
-export const WEARABLE_WS_URL = `ws://localhost:8000/ws/wearable`;
+// Wearable live stream WebSocket (same host as API)
+export const WEARABLE_WS_URL =
+  (BASE.replace(/^http/, "ws") as string) + "/ws/wearable";

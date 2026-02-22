@@ -67,22 +67,30 @@ export default function VitalsView() {
     ws.onopen = () => setLiveData((prev) => ({ ...prev, status: "connected" }));
 
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(event.data as string) as Record<string, unknown>;
+      } catch {
+        return;
+      }
+      if (!data || typeof data !== "object") return;
 
-      // Extract the live values from Apple Watch, Dexcom, and Oura Ring
-      const hr = data.apple_watch?.heart_rate_bpm ?? liveData.hr;
-      const sys =
-        data.apple_watch?.blood_pressure?.systolic_mmhg ?? liveData.sys;
-      const dia =
-        data.apple_watch?.blood_pressure?.diastolic_mmhg ?? liveData.dia;
-      const glucose = data.dexcom_g7?.glucose_mg_dl ?? liveData.glucose;
-      const glucoseTrend = data.dexcom_g7?.trend_key ?? "stable";
+      // Extract live values from backend WS payload (apple_watch, oura_ring, dexcom_g7)
+      const aw = data.apple_watch as Record<string, unknown> | undefined;
+      const bp = aw?.blood_pressure as { systolic_mmhg?: number; diastolic_mmhg?: number } | undefined;
+      const hr = (aw?.heart_rate_bpm as number | undefined) ?? liveData.hr;
+      const sys = bp?.systolic_mmhg ?? liveData.sys;
+      const dia = bp?.diastolic_mmhg ?? liveData.dia;
 
-      // Calculate absolute temp from Oura's delta (assuming 36.5C baseline)
-      const tempDelta = data.oura_ring?.skin_temperature_delta_c ?? 0;
+      const dexcom = data.dexcom_g7 as Record<string, unknown> | undefined;
+      const glucose = (dexcom?.glucose_mg_dl as number | undefined) ?? liveData.glucose;
+      const glucoseTrend = (dexcom?.trend_key as string | undefined) ?? "stable";
+
+      const oura = data.oura_ring as Record<string, unknown> | undefined;
+      const tempDelta = (oura?.skin_temperature_delta_c as number | undefined) ?? 0;
       const currentTemp = Number((36.5 + tempDelta).toFixed(1));
 
-      setLiveData({
+      setLiveData((prev) => ({
         hr,
         sys,
         dia,
@@ -91,9 +99,8 @@ export default function VitalsView() {
         glucoseTrend,
         status: "connected",
         lastSynced: new Date().toLocaleTimeString(),
-      });
+      }));
 
-      // Push the new live values into the chart history arrays (keep last 7 points)
       setHistory((prev) => ({
         hr: [...prev.hr.slice(1), hr],
         bpSys: [...prev.bpSys.slice(1), sys],
@@ -102,6 +109,8 @@ export default function VitalsView() {
       }));
     };
 
+    ws.onerror = () =>
+      setLiveData((prev) => ({ ...prev, status: "disconnected" }));
     ws.onclose = () =>
       setLiveData((prev) => ({ ...prev, status: "disconnected" }));
 

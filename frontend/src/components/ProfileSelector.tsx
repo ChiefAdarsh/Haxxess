@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { setWearableProfile } from "../api/client";
 
 const LS_KEY = "vitality_wearable_profile";
@@ -29,6 +29,15 @@ export default function ProfileSelector() {
       localStorage.setItem(LS_KEY, profile);
     } catch {}
   }, [profile]);
+
+  // Sync stored cycle state to backend on load so mock vitals and pipeline use it
+  const hasSyncedRef = useRef(false);
+  useEffect(() => {
+    if (hasSyncedRef.current) return;
+    hasSyncedRef.current = true;
+    const stored = getStoredProfile();
+    setWearableProfile(stored).catch(() => {});
+  }, []);
 
   const handleChange = (value: string) => {
     setProfile(value);
