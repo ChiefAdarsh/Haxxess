@@ -1,7 +1,7 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict, field
-from typing import Optional, Any
+from typing import Optional, Any, List
 import json
 
 logger = logging.getLogger("consolidate")
@@ -721,6 +721,53 @@ def score_behavioral(behavioral_data: Optional[Any] = None) -> SignalInput:
     return SignalInput(source="behavioral", score=75.0, confidence=0.0, weight=0.0)
 
 
+def score_symptoms(symptom_logs: Optional[List[dict]] = None) -> SignalInput:
+    """Score body-map symptom logs (last 7 days). High severity / pelvic flags reduce score."""
+    if not symptom_logs:
+        return SignalInput(
+            source="symptoms", score=75.0, confidence=0.0,
+            weight=0.0, flags=["No body-map symptom data"],
+        )
+    now = datetime.utcnow()
+    cutoff = (now - timedelta(days=7)).isoformat() + "Z"
+    recent = [s for s in symptom_logs if (s.get("timestamp") or "") >= cutoff]
+    if not recent:
+        return SignalInput(
+            source="symptoms", score=75.0, confidence=0.0,
+            weight=0.0, flags=["No symptoms in last 7 days"],
+        )
+    max_severity = max((s.get("severity") or 0) for s in recent)
+    pelvic_regions = {"pelvic_midline", "suprapubic", "vulva", "LLQ", "RLQ"}
+    high_severity_pelvic = [
+        s for s in recent
+        if (s.get("region") in pelvic_regions) and (s.get("severity") or 0) >= 6
+    ]
+    bleeding = [s for s in recent if (s.get("type") or "").lower() == "bleeding"]
+    flags = []
+    score = 75.0
+    if max_severity >= 8:
+        score -= 18
+        flags.append(f"Severe symptom reported (max severity {max_severity}/10)")
+    elif max_severity >= 6:
+        score -= 10
+        flags.append(f"Moderate-severe symptoms in last 7 days (max {max_severity}/10)")
+    if high_severity_pelvic:
+        score -= 8
+        flags.append(f"Pelvic/abdominal symptoms (severity ≥6): {len(high_severity_pelvic)} entries")
+    if bleeding:
+        score -= 5
+        flags.append("Bleeding logged in body map")
+    score = max(15.0, min(100.0, score))
+    confidence = 0.7 if len(recent) >= 2 else 0.5
+    return SignalInput(
+        source="symptoms",
+        score=round(score, 1),
+        confidence=confidence,
+        weight=15.0,
+        flags=flags or [f"{len(recent)} symptom(s) in last 7 days"],
+    )
+
+
 def _fuse_signals(signals: list[SignalInput]) -> tuple[float, list[str]]:
     contributing = []
     factors = []
@@ -758,6 +805,8 @@ def consolidate(
         transcript_analysis: Optional[Any] = None,
         behavioral_data: Optional[Any] = None,
         profile: Optional[str] = None,
+        symptom_logs: Optional[List[dict]] = None,
+        cycle_periods_context: Optional[dict] = None,
 ) -> VitalityResult:
     logger.info("═══════════════════════════════════════")
     logger.info("   VITALITY INDEX - consolidating")
@@ -765,6 +814,9 @@ def consolidate(
 
     cycle_mod = _get_cycle_mod(profile)
     logger.info(f"  Cycle phase: {cycle_mod['label']}")
+
+    if cycle_periods_context and cycle_periods_context.get("cycle_day") is not None:
+        logger.info(f"  Cycle tracker: day {cycle_periods_context.get('cycle_day')} (from periods)")
 
     if cycle_mod.get("expected_symptoms"):
         logger.info(f"  Expected symptoms: {', '.join(cycle_mod['expected_symptoms'])}")
@@ -775,6 +827,7 @@ def consolidate(
         score_voice(acoustic_result, cycle_mod),
         score_wearable(wearable_snapshot, cycle_mod),
         trend_signal,
+        score_symptoms(symptom_logs),
         score_nlp(transcript_analysis),
         score_behavioral(behavioral_data),
     ]
@@ -853,6 +906,12 @@ def consolidate(
     expected = cycle_mod.get("expected_symptoms", [])
     if expected:
         all_flags.append(f"[cycle] Expected for {cycle_mod['label']}: {', '.join(expected)}")
+    if cycle_periods_context and cycle_periods_context.get("cycle_day") is not None:
+        day = cycle_periods_context["cycle_day"]
+        phase = cycle_periods_context.get("phase_estimate") or "unknown"
+        all_flags.append(f"[cycle_tracker] Estimated day {day} ({phase})")
+        if cycle_periods_context.get("in_period"):
+            all_flags.append("[cycle_tracker] Currently in period window")
 
     tier = _get_tier(vitality_index)
 

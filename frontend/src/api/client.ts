@@ -103,6 +103,35 @@ export function getHistoryTrends(profile?: string, days = 30) {
   return request<any>(`/history/trends?${params}`);
 }
 
+// Body map / symptom logs (feed into pipeline)
+export function addSymptomLog(entry: {
+  region: string;
+  type: string;
+  severity: number;
+  qualities?: string[];
+  timing?: string;
+  triggers?: string[];
+  notes?: string;
+}) {
+  return request<any>("/symptoms", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      region: entry.region,
+      type: entry.type,
+      severity: entry.severity,
+      qualities: entry.qualities ?? [],
+      timing: entry.timing ?? "",
+      triggers: entry.triggers ?? [],
+      notes: entry.notes ?? "",
+    }),
+  });
+}
+
+export function getSymptoms(days = 30) {
+  return request<any>(`/symptoms?days=${days}`);
+}
+
 // Wearable live stream WebSocket (same host as API)
 export const WEARABLE_WS_URL =
   (BASE.replace(/^http/, "ws") as string) + "/ws/wearable";

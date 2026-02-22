@@ -70,8 +70,20 @@ class AddPeriodRequest(BaseModel):
     notes: Optional[str] = None
 
 
-# In-memory cycle store (hackathon-safe). In production, replace with DB keyed by patient_id.
+class SymptomEntryPayload(BaseModel):
+    """Body map / symptom log entry (id and timestamp can be server-generated)."""
+    region: str
+    type: str
+    severity: int
+    qualities: List[str] = []
+    timing: str = ""
+    triggers: List[str] = []
+    notes: str = ""
+
+
+# In-memory stores (hackathon-safe). In production, replace with DB keyed by patient_id.
 _cycle_periods: List[PeriodEvent] = []
+_symptom_logs: List[Dict[str, Any]] = []
 
 
 print("     Loading AI models...")
@@ -121,6 +133,8 @@ def _ensure_consolidated(profile: Optional[str] = None) -> Any:
             acoustic_result=_latest_acoustic,
             wearable_snapshot=snapshot,
             profile=prof,
+            symptom_logs=_symptom_logs,
+            cycle_periods_context=_cycle_periods_context(_cycle_periods),
         )
     return _latest_consolidated
 
@@ -203,6 +217,45 @@ def _cycle_predictions(periods: List[PeriodEvent]) -> Dict[str, Any]:
     }
 
 
+def _cycle_periods_context(periods: List[PeriodEvent]) -> Dict[str, Any]:
+    """Derive cycle day and phase from logged periods for pipeline context."""
+    if not periods:
+        return {"cycle_day": None, "phase_estimate": None, "in_period": False}
+    periods_sorted = sorted(periods, key=lambda p: p.startDate)
+    last = periods_sorted[-1]
+    last_start = _parse_date_ymd(last.startDate)
+    stats = _cycle_stats(periods_sorted)
+    cycle_len = stats.get("median_cycle_length") or 28
+    cycle_len = int(round(cycle_len))
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    start_naive = last_start.replace(hour=0, minute=0, second=0, microsecond=0)
+    days_since_start = (today - start_naive).days
+    if days_since_start < 0:
+        days_since_start = (days_since_start % cycle_len) if cycle_len else 0
+    cycle_day = (days_since_start % cycle_len) + 1 if cycle_len else 1
+
+    end_naive = _parse_date_ymd(last.endDate).replace(hour=0, minute=0, second=0, microsecond=0) if last.endDate else start_naive + timedelta(days=4)
+    in_period = start_naive <= today <= end_naive
+
+    if cycle_day <= 5 or in_period:
+        phase_estimate = "follicular"
+    elif cycle_day <= 13:
+        phase_estimate = "follicular"
+    elif cycle_day <= 15:
+        phase_estimate = "ovulation"
+    elif cycle_day <= 21:
+        phase_estimate = "luteal_mild"
+    else:
+        phase_estimate = "luteal_pms"
+
+    return {
+        "cycle_day": cycle_day,
+        "phase_estimate": phase_estimate,
+        "in_period": in_period,
+        "median_cycle_length": stats.get("median_cycle_length"),
+    }
+
+
 def transcribe(file_path: str) -> str:
     print("     Transcribing voice...")
     audio, _ = librosa.load(file_path, sr=16000, mono=True)
@@ -280,6 +333,8 @@ async def get_consolidated(
             acoustic_result=_latest_acoustic,
             wearable_snapshot=snapshot,
             profile=prof,
+            symptom_logs=_symptom_logs,
+            cycle_periods_context=_cycle_periods_context(_cycle_periods),
         )
         _latest_consolidated = result
 
@@ -334,6 +389,8 @@ async def post_consolidated(
             acoustic_result=_latest_acoustic,
             wearable_snapshot=snapshot,
             profile=prof,
+            symptom_logs=_symptom_logs,
+            cycle_periods_context=_cycle_periods_context(_cycle_periods),
         )
         _latest_consolidated = result
 
@@ -372,6 +429,8 @@ async def get_status():
         acoustic_result=_latest_acoustic,
         wearable_snapshot=snapshot,
         profile=prof,
+        symptom_logs=_symptom_logs,
+        cycle_periods_context=_cycle_periods_context(_cycle_periods),
     )
 
     return {
@@ -437,6 +496,53 @@ async def add_cycle_period(req: AddPeriodRequest):
         "stats": stats,
         "predictions": preds,
     }
+
+
+@app.get("/symptoms")
+async def get_symptoms(days: int = 30):
+    """Return recent body-map symptom logs for pipeline and display."""
+    cutoff = (datetime.utcnow() - timedelta(days=max(1, min(days, 365)))).isoformat() + "Z"
+    recent = [s for s in _symptom_logs if (s.get("timestamp") or "") >= cutoff]
+    return {"status": "success", "symptoms": recent, "count": len(recent)}
+
+
+@app.post("/symptoms")
+async def add_symptom(entry: SymptomEntryPayload):
+    """Append one body-map symptom log (from Body Map / SymptomContext)."""
+    global _symptom_logs
+    rec = {
+        "id": f"s{datetime.utcnow().timestamp():.0f}",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "region": entry.region,
+        "type": entry.type,
+        "severity": entry.severity,
+        "qualities": entry.qualities,
+        "timing": entry.timing,
+        "triggers": entry.triggers,
+        "notes": entry.notes,
+    }
+    _symptom_logs.append(rec)
+    return {"status": "success", "symptom": rec}
+
+
+@app.post("/symptoms/bulk")
+async def add_symptoms_bulk(entries: List[SymptomEntryPayload]):
+    """Sync multiple symptom entries (e.g. on app load)."""
+    global _symptom_logs
+    for entry in entries:
+        rec = {
+            "id": f"s{datetime.utcnow().timestamp():.0f}",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "region": entry.region,
+            "type": entry.type,
+            "severity": entry.severity,
+            "qualities": entry.qualities,
+            "timing": entry.timing,
+            "triggers": entry.triggers,
+            "notes": entry.notes,
+        }
+        _symptom_logs.append(rec)
+    return {"status": "success", "count": len(entries)}
 
 
 @app.put("/settings/wearable-profile")

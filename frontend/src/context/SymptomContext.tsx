@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import type { SymptomEntry, BodyRegion } from "../types";
+import { addSymptomLog } from "../api/client";
 
 // seed data so the demo isn't empty
 const seedData: SymptomEntry[] = [
@@ -113,8 +114,17 @@ export function SymptomProvider({ children }: { children: ReactNode }) {
       id: `s${Date.now()}`,
       timestamp: new Date().toISOString(),
     };
-    // Prepend to array so newest is first
     setSymptoms((prev) => [newEntry, ...prev]);
+    // Sync to backend so pipeline (consolidate, alerts) uses body-map data
+    addSymptomLog({
+      region: entry.region,
+      type: entry.type,
+      severity: entry.severity,
+      qualities: entry.qualities,
+      timing: entry.timing,
+      triggers: entry.triggers,
+      notes: entry.notes,
+    }).catch(() => {});
   };
 
   const getByRegion = (region: BodyRegion) =>
