@@ -14,10 +14,12 @@ export default function Sidebar({ role, tabs, active, onTabChange, onLogout }: S
   return (
     <aside style={{
       width: 240, // Slightly wider for a more modern feel
+      height: '100vh',
       backgroundColor: '#fff',
       borderRight: '1px solid #f1f5f9', // Softer border
       display: 'flex',
       flexDirection: 'column',
+      overflow: 'hidden',
       boxShadow: '4px 0 24px rgba(0,0,0,0.01)', // Very subtle shadow
       zIndex: 20
     }}>
@@ -68,7 +70,7 @@ export default function Sidebar({ role, tabs, active, onTabChange, onLogout }: S
       {role === 'patient' && <ProfileSelector />}
 
       {/* Nav Tabs */}
-      <nav style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <nav style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 0, overflowY: 'auto' }}>
         <p style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', margin: '0 0 8px 8px', letterSpacing: '0.02em' }}>
           Menu
         </p>

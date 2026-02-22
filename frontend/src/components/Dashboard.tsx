@@ -101,6 +101,7 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
     <div style={{
       display: 'flex',
       height: '100vh',
+      overflow: 'hidden',
       fontFamily: '"Inter", system-ui, sans-serif',
       backgroundColor: '#fdfafa',
     }}>
