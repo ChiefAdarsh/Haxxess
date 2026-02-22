@@ -1,44 +1,65 @@
-import { useState, useEffect } from 'react'
-import { Pill, Dumbbell, UtensilsCrossed, Check, Brain, Sparkles, Loader2 } from 'lucide-react'
-import { getCoaching } from '../../api/client'
-import { getStoredProfile } from '../ProfileSelector'
+import { useState, useEffect } from "react";
+import {
+  Pill,
+  Dumbbell,
+  UtensilsCrossed,
+  Check,
+  Brain,
+  Sparkles,
+  Loader2,
+} from "lucide-react";
+import { getCoaching } from "../../api/client";
+import { getStoredProfile } from "../ProfileSelector";
 
 interface Task {
-  id: string
-  label: string
-  time?: string
-  category: 'medication' | 'exercise' | 'diet' | 'mindfulness'
-  done: boolean
-  reasoning?: string
+  id: string;
+  label: string;
+  time?: string;
+  category: "medication" | "exercise" | "diet" | "mindfulness";
+  done: boolean;
+  reasoning?: string;
 }
 
 const routineTasks: Task[] = [
-  { id: '1', label: 'Metformin 500mg', time: '8:00 AM', category: 'medication', done: true },
-  { id: '2', label: 'Lisinopril 10mg', time: '8:00 AM', category: 'medication', done: true },
-]
+  {
+    id: "1",
+    label: "Metformin 500mg",
+    time: "8:00 AM",
+    category: "medication",
+    done: true,
+  },
+  {
+    id: "2",
+    label: "Lisinopril 10mg",
+    time: "8:00 AM",
+    category: "medication",
+    done: true,
+  },
+];
 
 const categoryConfig = {
-  medication: { icon: Pill, color: '#dc2626', label: 'Routine Meds' },
-  exercise: { icon: Dumbbell, color: '#2563eb', label: 'Movement' },
-  diet: { icon: UtensilsCrossed, color: '#10b981', label: 'Nutrition' },
-  mindfulness: { icon: Brain, color: '#7c3aed', label: 'Mind & Rest' }
-}
+  medication: { icon: Pill, color: "#dc2626", label: "Routine Meds" },
+  exercise: { icon: Dumbbell, color: "#2563eb", label: "Movement" },
+  diet: { icon: UtensilsCrossed, color: "#10b981", label: "Nutrition" },
+  mindfulness: { icon: Brain, color: "#7c3aed", label: "Mind & Rest" },
+};
 
 export default function WellnessView() {
-  const [tasks, setTasks] = useState<Task[]>(routineTasks)
-  const [loading, setLoading] = useState(true)
-  const [aiEncouragement, setAiEncouragement] = useState<string>("")
+  const [tasks, setTasks] = useState<Task[]>(routineTasks);
+  const [loading, setLoading] = useState(true);
+  const [aiEncouragement, setAiEncouragement] = useState<string>("");
 
   useEffect(() => {
     const fetchCoachingPlan = async () => {
       try {
-        setLoading(true)
-        const data = await getCoaching(getStoredProfile())
+        setLoading(true);
+        const data = await getCoaching(getStoredProfile());
 
-        if (data.status === 'success' && data.data) {
-          const aiPlan = data.data.coaching_plan || []
-          const encouragement = data.data.encouragement || "Stay consistent, you're doing great."
-          setAiEncouragement(encouragement)
+        if (data.status === "success" && data.data) {
+          const aiPlan = data.data.coaching_plan || [];
+          const encouragement =
+            data.data.encouragement || "Stay consistent, you're doing great.";
+          setAiEncouragement(encouragement);
 
           // Map LLM response to our Task interface
           const newAiTasks: Task[] = aiPlan.map((item: any, idx: number) => ({
@@ -47,78 +68,140 @@ export default function WellnessView() {
             time: item.timeframe,
             category: mapCategory(item.category),
             done: false,
-            reasoning: item.reasoning
-          }))
+            reasoning: item.reasoning,
+          }));
 
           // Merge routine meds with the new dynamic AI plan
-          setTasks([...routineTasks, ...newAiTasks])
+          setTasks([...routineTasks, ...newAiTasks]);
         }
       } catch (err) {
-        console.error("Failed to fetch AI plan", err)
+        console.error("Failed to fetch AI plan", err);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchCoachingPlan()
-  }, [])
+    fetchCoachingPlan();
+  }, []);
 
   // Helper to map LLM categories to our internal types
-  const mapCategory = (cat: string): Task['category'] => {
-    const c = cat.toLowerCase()
-    if (c.includes('breath') || c.includes('sleep') || c.includes('stress')) return 'mindfulness'
-    if (c.includes('food') || c.includes('water') || c.includes('nutrition')) return 'diet'
-    if (c.includes('walk') || c.includes('run') || c.includes('move')) return 'exercise'
-    return 'medication'
-  }
+  const mapCategory = (cat: string): Task["category"] => {
+    const c = cat.toLowerCase();
+    if (c.includes("breath") || c.includes("sleep") || c.includes("stress"))
+      return "mindfulness";
+    if (c.includes("food") || c.includes("water") || c.includes("nutrition"))
+      return "diet";
+    if (c.includes("walk") || c.includes("run") || c.includes("move"))
+      return "exercise";
+    return "medication";
+  };
 
   const toggle = (id: string) => {
-    setTasks(tasks.map((t) => t.id === id ? { ...t, done: !t.done } : t))
-  }
+    setTasks(tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  };
 
-  const completed = tasks.filter((t) => t.done).length
-  const total = tasks.length
-  const pct = total > 0 ? Math.round((completed / total) * 100) : 0
+  const completed = tasks.filter((t) => t.done).length;
+  const total = tasks.length;
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 20,
+        }}
+      >
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 600, color: '#1f2937', margin: 0 }}>Wellness Plan</h2>
-          <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>Generated by Vitality Intelligence</p>
+          <h2
+            style={{
+              fontSize: 18,
+              fontWeight: 600,
+              color: "#1f2937",
+              margin: 0,
+            }}
+          >
+            Wellness Plan
+          </h2>
+          <p style={{ fontSize: 13, color: "#6b7280", margin: "4px 0 0" }}>
+            Generated by Vitality Intelligence
+          </p>
         </div>
-        <span style={{ fontSize: 13, color: '#9ca3af' }}>{completed}/{total} completed</span>
+        <span style={{ fontSize: 13, color: "#9ca3af" }}>
+          {completed}/{total} completed
+        </span>
       </div>
 
       {/* Progress Bar */}
-      <div style={{
-        backgroundColor: '#fff', borderRadius: 12, border: '1px solid #e5e7eb',
-        padding: '16px 20px', marginBottom: 20,
-      }}>
-        <div style={{
-          height: 8, borderRadius: 4, backgroundColor: '#f3f4f6', overflow: 'hidden',
-        }}>
-          <div style={{
-            height: '100%', borderRadius: 4, backgroundColor: '#dc2626',
-            width: `${pct}%`, transition: 'width 0.5s ease',
-          }} />
+      <div
+        style={{
+          backgroundColor: "#fff",
+          borderRadius: 12,
+          border: "1px solid #e5e7eb",
+          padding: "16px 20px",
+          marginBottom: 20,
+        }}
+      >
+        <div
+          style={{
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: "#f3f4f6",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              borderRadius: 4,
+              backgroundColor: "#dc2626",
+              width: `${pct}%`,
+              transition: "width 0.5s ease",
+            }}
+          />
         </div>
-        <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0' }}>{pct}% of today's goals complete</p>
+        <p style={{ fontSize: 12, color: "#9ca3af", margin: "8px 0 0" }}>
+          {pct}% of today's goals complete
+        </p>
       </div>
 
       {/* AI Encouragement Banner */}
       {!loading && aiEncouragement && (
-        <div style={{
-          display: 'flex', gap: 12, alignItems: 'flex-start',
-          backgroundColor: '#eff6ff', border: '1px solid #dbeafe',
-          borderRadius: 12, padding: 16, marginBottom: 24
-        }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            alignItems: "flex-start",
+            backgroundColor: "#eff6ff",
+            border: "1px solid #dbeafe",
+            borderRadius: 12,
+            padding: 16,
+            marginBottom: 24,
+          }}
+        >
           <Sparkles size={18} color="#2563eb" style={{ marginTop: 2 }} />
           <div>
-            <p style={{ fontSize: 12, fontWeight: 700, color: '#1e40af', margin: '0 0 4px', textTransform: 'uppercase' }}>
+            <p
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#1e40af",
+                margin: "0 0 4px",
+                textTransform: "uppercase",
+              }}
+            >
               Daily Insight
             </p>
-            <p style={{ fontSize: 14, color: '#1e3a8a', margin: 0, fontStyle: 'italic' }}>
+            <p
+              style={{
+                fontSize: 14,
+                color: "#1e3a8a",
+                margin: 0,
+                fontStyle: "italic",
+              }}
+            >
               "{aiEncouragement}"
             </p>
           </div>
@@ -127,79 +210,149 @@ export default function WellnessView() {
 
       {/* Loading State */}
       {loading && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, color: '#9ca3af' }}>
-          <Loader2 className="animate-spin" size={24} style={{ marginRight: 10 }} />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 40,
+            color: "#9ca3af",
+          }}
+        >
+          <Loader2
+            className="animate-spin"
+            size={24}
+            style={{ marginRight: 10 }}
+          />
           <span>Generating your personalized plan...</span>
         </div>
       )}
 
       {/* Task List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {(['medication', 'diet', 'exercise', 'mindfulness'] as const).map((cat) => {
-          const config = categoryConfig[cat]
-          const Icon = config.icon
-          const catTasks = tasks.filter((t) => t.category === cat)
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        {(["medication", "diet", "exercise", "mindfulness"] as const).map(
+          (cat) => {
+            const config = categoryConfig[cat];
+            const Icon = config.icon;
+            const catTasks = tasks.filter((t) => t.category === cat);
 
-          if (catTasks.length === 0) return null
+            if (catTasks.length === 0) return null;
 
-          return (
-            <div key={cat}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <Icon size={16} color={config.color} />
-                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', margin: 0 }}>{config.label}</h3>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {catTasks.map((task) => (
-                  <button
-                    key={task.id}
-                    onClick={() => toggle(task.id)}
+            return (
+              <div key={cat}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 10,
+                  }}
+                >
+                  <Icon size={16} color={config.color} />
+                  <h3
                     style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 12,
-                      padding: '14px 16px', borderRadius: 10,
-                      border: '1px solid #e5e7eb', backgroundColor: '#fff',
-                      cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
-                      opacity: task.done ? 0.6 : 1,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#1f2937",
+                      margin: 0,
                     }}
                   >
-                    <div style={{
-                      width: 24, height: 24, borderRadius: 6,
-                      border: task.done ? 'none' : `2px solid ${config.color}`,
-                      backgroundColor: task.done ? config.color : 'transparent',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0, transition: 'all 0.15s', marginTop: 2
-                    }}>
-                      {task.done && <Check size={14} color="#fff" />}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <span style={{
-                        fontSize: 14, fontWeight: 500, color: '#1f2937',
-                        textDecoration: task.done ? 'line-through' : 'none',
-                        display: 'block', marginBottom: 2
-                      }}>{task.label}</span>
-
-                      {/* Show the AI's reasoning if available */}
-                      {task.reasoning && !task.done && (
-                        <span style={{ fontSize: 12, color: '#6b7280', display: 'block', marginBottom: 4 }}>
-                          💡 {task.reasoning}
+                    {config.label}
+                  </h3>
+                </div>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                  {catTasks.map((task) => (
+                    <button
+                      key={task.id}
+                      onClick={() => toggle(task.id)}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 12,
+                        padding: "14px 16px",
+                        borderRadius: 10,
+                        border: "1px solid #e5e7eb",
+                        backgroundColor: "#fff",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "all 0.15s",
+                        opacity: task.done ? 0.6 : 1,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 6,
+                          border: task.done
+                            ? "none"
+                            : `2px solid ${config.color}`,
+                          backgroundColor: task.done
+                            ? config.color
+                            : "transparent",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          transition: "all 0.15s",
+                          marginTop: 2,
+                        }}
+                      >
+                        {task.done && <Check size={14} color="#fff" />}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <span
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 500,
+                            color: "#1f2937",
+                            textDecoration: task.done ? "line-through" : "none",
+                            display: "block",
+                            marginBottom: 2,
+                          }}
+                        >
+                          {task.label}
                         </span>
-                      )}
 
-                      {task.time && (
-                        <span style={{
-                          fontSize: 11, color: config.color, fontWeight: 600,
-                          backgroundColor: `${config.color}10`, padding: '2px 6px', borderRadius: 4
-                        }}>
-                          {task.time}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                ))}
+                        {/* Show the AI's reasoning if available */}
+                        {task.reasoning && !task.done && (
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#6b7280",
+                              display: "block",
+                              marginBottom: 4,
+                            }}
+                          >
+                            💡 {task.reasoning}
+                          </span>
+                        )}
+
+                        {task.time && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: config.color,
+                              fontWeight: 600,
+                              backgroundColor: `${config.color}10`,
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                            }}
+                          >
+                            {task.time}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )
-        })}
+            );
+          },
+        )}
       </div>
     </div>
-  )
+  );
 }
