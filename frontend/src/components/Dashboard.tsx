@@ -25,24 +25,9 @@ interface DashboardProps {
 
 function Placeholder({ label }: { label: string }) {
   return (
-    <div
-      style={{
-        border: "2px dashed #fbcfe8",
-        borderRadius: 16,
-        backgroundColor: "#fdf2f8",
-        padding: "80px 20px",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <Sparkles
-        color="#ec4899"
-        size={24}
-        style={{ marginBottom: 12, opacity: 0.5 }}
-      />
-      <p style={{ color: "#be185d", fontSize: 14, fontWeight: 500 }}>
+    <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-pink-200 bg-pink-50 py-20">
+      <Sparkles className="mb-3 opacity-50" size={24} color="#ec4899" />
+      <p className="text-sm font-medium text-pink-800">
         {label} is under development
       </p>
     </div>
@@ -51,6 +36,7 @@ function Placeholder({ label }: { label: string }) {
 
 export default function Dashboard({ role, onLogout }: DashboardProps) {
   const tabs = role === "patient" ? patientTabs : clinicianTabs;
+
   const [active, setActive] = useState(
     role === "patient" ? "home" : "dashboard",
   );
@@ -58,20 +44,19 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
 
   const current = tabs.find((t) => t.id === active);
 
-  const patientName = (() => {
-    try {
-      return localStorage.getItem("vitality_patient_name") ?? "Patient";
-    } catch {
-      return "Patient";
-    }
-  })();
+  const patientName =
+    typeof window !== "undefined"
+      ? (localStorage.getItem("vitality_patient_name") ?? "Patient")
+      : "Patient";
 
-  const patientInitials = (() => {
-    const parts = patientName.trim().split(" ").filter(Boolean);
-    const first = parts[0]?.[0] ?? "P";
-    const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-    return (first + last).toUpperCase();
-  })();
+  const patientInitials = patientName
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   const handleTabChange = (id: string) => {
     setActive(id);
@@ -85,33 +70,50 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
 
   const renderContent = () => {
     if (role === "patient") {
-      if (active === "home") return <PatientHome />;
-      if (active === "messages") return <MessagesView />;
-      if (active === "vitals") return <VitalsView />;
-      if (active === "wellness") return <WellnessView />;
-      if (active === "bodymap") return <BodyMap />;
-      if (active === "history") return <SymptomHistory />;
-      if (active === "tracker") return <PatientTracker />;
-      if (active === "cycle") return <PatientCycle />;
-      if (active === "callin") return <CallIn />;
-      return <Placeholder label={current?.label ?? ""} />;
+      switch (active) {
+        case "home":
+          return <PatientHome />;
+        case "messages":
+          return <MessagesView />;
+        case "vitals":
+          return <VitalsView />;
+        case "wellness":
+          return <WellnessView />;
+        case "bodymap":
+          return <BodyMap />;
+        case "history":
+          return <SymptomHistory />;
+        case "tracker":
+          return <PatientTracker />;
+        case "cycle":
+          return <PatientCycle />;
+        case "callin":
+          return <CallIn />;
+        default:
+          return <Placeholder label={current?.label ?? ""} />;
+      }
     }
+
     if (role === "clinician") {
-      if (active === "dashboard")
-        return <DashboardHome onSelectPatient={handleSelectPatient} />;
-      if (active === "patients" && selectedPatient)
-        return (
-          <PatientDetail
-            patient={selectedPatient}
-            onBack={() => setSelectedPatient(null)}
-          />
-        );
-      if (active === "patients")
-        return <PatientList onSelectPatient={setSelectedPatient} />;
-      if (active === "cases")
-        return <CasesView onSelectPatient={handleSelectPatient} />;
-      if (active === "alerts") return <AlertsView />;
-      return <Placeholder label={current?.label ?? ""} />;
+      switch (active) {
+        case "dashboard":
+          return <DashboardHome onSelectPatient={handleSelectPatient} />;
+        case "patients":
+          return selectedPatient ? (
+            <PatientDetail
+              patient={selectedPatient}
+              onBack={() => setSelectedPatient(null)}
+            />
+          ) : (
+            <PatientList onSelectPatient={handleSelectPatient} />
+          );
+        case "cases":
+          return <CasesView onSelectPatient={handleSelectPatient} />;
+        case "alerts":
+          return <AlertsView />;
+        default:
+          return <Placeholder label={current?.label ?? ""} />;
+      }
     }
   };
 
@@ -123,18 +125,7 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
         : (current?.label ?? "");
 
   return (
-    <div
-      style={{
-        display: "flex",
-        height: "100vh",
-        width: "100vw",
-        maxWidth: "100vw",
-        overflowX: "hidden",
-        overflowY: "hidden",
-        fontFamily: "Inter, system-ui, sans-serif",
-        backgroundColor: "#fdfafa",
-      }}
-    >
+    <div className="flex h-screen w-screen overflow-hidden bg-rose-50 font-sans">
       <Sidebar
         role={role}
         tabs={tabs}
@@ -143,116 +134,38 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
         onLogout={onLogout}
       />
 
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          minHeight: 0,
-          flexDirection: "column",
-          backgroundColor: "#f8fafc",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: -150,
-            right: -150,
-            width: 400,
-            height: 400,
-            background:
-              "radial-gradient(circle, rgba(236,72,153,0.1) 0%, rgba(248,250,252,0) 70%)",
-            borderRadius: "50%",
-            pointerEvents: "none",
-            zIndex: 0,
-          }}
-        />
+      <div className="relative flex flex-1 flex-col bg-slate-50">
+        <div className="pointer-events-none absolute -right-40 -top-40 h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(236,72,153,0.1)_0%,rgba(248,250,252,0)_70%)]" />
 
-        <header
-          style={{
-            position: "relative",
-            background: "linear-gradient(135deg, #be185d 0%, #db2777 100%)",
-            color: "#fff",
-            padding: "20px 28px",
-            fontSize: 18,
-            fontWeight: 600,
-            letterSpacing: "-0.01em",
-            boxShadow:
-              "0 4px 6px -1px rgba(190,24,93,0.1), 0 2px 4px -1px rgba(190,24,93,0.06)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            zIndex: 10,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {role === "patient" && <Sparkles size={20} color="#fbcfe8" />}
+        <header className="relative z-10 flex items-center justify-between bg-gradient-to-br from-pink-800 to-pink-600 px-7 py-5 text-white shadow-md">
+          <div className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+            {role === "patient" && (
+              <Sparkles size={18} className="text-pink-200" />
+            )}
             {headerLabel}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 13, color: "#fbcfe8", fontWeight: 500 }}>
+
+          <div className="flex items-center gap-4">
+            <span className="text-xs font-medium text-pink-200">
               {role === "clinician" ? "Dr. Priti" : "See Your Vitality Portal"}
             </span>
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: "#fdf2f8",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#be185d",
-                fontSize: 14,
-                fontWeight: 700,
-              }}
-            >
+
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-50 text-sm font-bold text-pink-800">
               {role === "clinician" ? "SM" : patientInitials}
             </div>
           </div>
         </header>
 
-        <main
-          style={{
-            position: "relative",
-            flex: 1,
-            padding: "clamp(16px, 3vw, 32px)",
-            overflow: "auto",
-            zIndex: 10,
-          }}
-        >
-          <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-            {renderContent()}
-          </div>
+        <main className="relative z-10 flex-1 overflow-y-auto p-6 md:p-8">
+          <div className="mx-auto max-w-6xl">{renderContent()}</div>
         </main>
 
-        <footer
-          style={{
-            position: "relative",
-            padding: "12px 24px",
-            borderTop: "1px solid #f1f5f9",
-            backgroundColor: "#fff",
-            display: "flex",
-            justifyContent: "center",
-            gap: 20,
-            fontSize: 11,
-            color: "#94a3b8",
-            letterSpacing: "0.02em",
-            zIndex: 10,
-          }}
-        >
-          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: "#dc2626",
-              }}
-            />
+        <footer className="relative z-10 flex flex-wrap items-center justify-center gap-6 border-t bg-white px-6 py-3 text-[11px] tracking-wide text-slate-400">
+          <span className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
             Not for emergencies — call 911 for severe symptoms
           </span>
+
           <span>
             AI triage suggestions are informational — clinician review required
           </span>

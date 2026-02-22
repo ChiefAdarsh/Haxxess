@@ -39,26 +39,8 @@ export default function ProfileSelector() {
   };
 
   return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: "100vw",
-        boxSizing: "border-box",
-        padding: "12px 16px",
-        borderTop: "1px solid #f1f5f9",
-        overflowX: "hidden",
-      }}
-    >
-      <p
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: "#94a3b8",
-          textTransform: "uppercase",
-          margin: "0 0 8px",
-          letterSpacing: "0.02em",
-        }}
-      >
+    <div className="w-full max-w-full box-border px-4 py-3 border-t border-slate-100 overflow-x-hidden">
+      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">
         Cycle state
       </p>
 
@@ -66,19 +48,14 @@ export default function ProfileSelector() {
         value={profile}
         onChange={(e) => handleChange(e.target.value)}
         disabled={updating}
-        style={{
-          width: "100%",
-          maxWidth: "100%",
-          boxSizing: "border-box",
-          padding: "10px 12px",
-          borderRadius: 8,
-          border: "1px solid #e5e7eb",
-          fontSize: 13,
-          color: "#1f2937",
-          backgroundColor: "#fff",
-          cursor: updating ? "not-allowed" : "pointer",
-          opacity: updating ? 0.6 : 1,
-        }}
+        className={`w-full max-w-full box-border px-3 py-2.5 rounded-lg border text-sm bg-white transition
+          ${
+            updating
+              ? "cursor-not-allowed opacity-60"
+              : "cursor-pointer hover:border-slate-300"
+          }
+          border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-pink-500/30 focus:border-pink-400
+        `}
       >
         {PROFILES.map((p) => (
           <option key={p.id} value={p.id}>
@@ -88,9 +65,7 @@ export default function ProfileSelector() {
       </select>
 
       {updating && (
-        <p style={{ fontSize: 10, color: "#94a3b8", margin: "4px 0 0" }}>
-          Updating pipeline...
-        </p>
+        <p className="text-[10px] text-slate-400 mt-1">Updating pipeline...</p>
       )}
     </div>
   );

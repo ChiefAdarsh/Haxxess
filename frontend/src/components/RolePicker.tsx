@@ -15,66 +15,16 @@ function RoleCard({
   return (
     <button
       onClick={onClick}
-      style={{
-        width: 240,
-        padding: "40px 24px",
-        borderRadius: 20, // Softer corners
-        border: "2px solid transparent",
-        backgroundColor: "rgba(255, 255, 255, 0.6)", // Increased transparency to let SVG show through
-        backdropFilter: "blur(16px)", // Stronger glass effect
-        cursor: "pointer",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 16,
-        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        boxShadow:
-          "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255,255,255,0.6)",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "rgba(219, 39, 119, 0.5)"; // Soft pink border on hover
-        e.currentTarget.style.boxShadow =
-          "0 10px 40px rgba(219, 39, 119, 0.15), inset 0 1px 0 rgba(255,255,255,0.8)";
-        e.currentTarget.style.transform = "translateY(-4px)"; // Slight lift
-        e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.9)"; // Less transparent on hover
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "transparent";
-        e.currentTarget.style.boxShadow =
-          "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255,255,255,0.6)";
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.6)";
-      }}
+      className="w-60 px-6 py-10 rounded-[20px] border-2 border-transparent bg-white/60 backdrop-blur-xl cursor-pointer flex flex-col items-center gap-4 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05),0_2px_4px_-1px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.6)] hover:border-pink-500/50 hover:shadow-[0_10px_40px_rgba(219,39,119,0.15),inset_0_1px_0_rgba(255,255,255,0.8)] hover:-translate-y-1 hover:bg-white/90"
     >
-      <div
-        style={{
-          width: 72,
-          height: 72,
-          borderRadius: 36,
-          background: "linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)", // Pink gradient circle
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "inset 0 2px 4px rgba(255,255,255,0.8)", // Inner highlight
-        }}
-      >
-        <Icon size={32} color="#be185d" /> {/* Deep rose icon */}
+      <div className="w-[72px] h-[72px] rounded-full bg-gradient-to-br from-pink-50 to-pink-100 flex items-center justify-center shadow-[inset_0_2px_4px_rgba(255,255,255,0.8)]">
+        <Icon size={32} className="text-pink-700" />
       </div>
-      <div style={{ textAlign: "center" }}>
-        <p
-          style={{
-            fontWeight: 600,
-            fontSize: 17,
-            color: "#1f2937",
-            margin: 0,
-            letterSpacing: "-0.01em",
-          }}
-        >
+      <div className="text-center">
+        <p className="font-semibold text-[17px] text-slate-800 tracking-tight m-0">
           {label}
         </p>
-        <p style={{ fontSize: 13, color: "#6b7280", margin: "6px 0 0" }}>
-          {subtitle}
-        </p>
+        <p className="text-sm text-slate-500 mt-1.5">{subtitle}</p>
       </div>
     </button>
   );
@@ -86,77 +36,20 @@ export default function RolePicker({
   onSelect: (role: Role) => void;
 }) {
   return (
-    <div
-      style={{
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-
-        // THIS IS THE NEW PART:
-        backgroundColor: "#f8fafc",
-        backgroundImage: "url(/vitalitybg.svg)",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-
-        fontFamily: '"Inter", system-ui, sans-serif',
-        gap: 48,
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          textAlign: "center",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          zIndex: 10,
-        }}
-      >
-        <div
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 16,
-            background: "linear-gradient(135deg, #be185d 0%, #db2777 100%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow:
-              "0 8px 16px rgba(190, 24, 93, 0.2), inset 0 2px 4px rgba(255,255,255,0.3)",
-            marginBottom: 16,
-          }}
-        >
-          <Sparkles size={28} color="#fff" />
+    <div className="h-screen flex flex-col items-center justify-center bg-slate-50 bg-[url('/vitalitybg.svg')] bg-cover bg-center bg-no-repeat font-sans gap-12 relative overflow-hidden">
+      <div className="text-center flex flex-col items-center z-10">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-700 to-pink-600 flex items-center justify-center shadow-[0_8px_16px_rgba(190,24,93,0.2),inset_0_2px_4px_rgba(255,255,255,0.3)] mb-4">
+          <Sparkles size={28} className="text-white" />
         </div>
-        <h1
-          style={{
-            fontSize: 36,
-            fontWeight: 700,
-            color: "#1f2937",
-            margin: 0,
-            letterSpacing: "-0.03em",
-          }}
-        >
+        <h1 className="text-4xl font-bold text-slate-800 tracking-[-0.03em] m-0">
           Vitality Health
         </h1>
-        <p
-          style={{
-            color: "#6b7280",
-            fontSize: 15,
-            margin: "8px 0 0",
-            fontWeight: 500,
-            letterSpacing: "0.01em",
-          }}
-        >
+        <p className="text-slate-500 text-[15px] mt-2 font-medium tracking-wide">
           A preventive partner that treats symptoms like vital signs
         </p>
       </div>
 
-      <div style={{ display: "flex", gap: 24, zIndex: 10 }}>
+      <div className="flex gap-6 z-10">
         <RoleCard
           label="I'm a Patient"
           subtitle="Track symptoms & voice journals"
@@ -171,18 +64,7 @@ export default function RolePicker({
         />
       </div>
 
-      <div
-        style={{
-          position: "absolute",
-          bottom: 32,
-          fontSize: 12,
-          color: "#94a3b8",
-          fontWeight: 500,
-          letterSpacing: "0.05em",
-          textTransform: "uppercase",
-          zIndex: 10,
-        }}
-      >
+      <div className="absolute bottom-8 text-xs text-slate-400 font-medium tracking-widest uppercase z-10">
         Built for Axxess Hackathon 2026
       </div>
     </div>

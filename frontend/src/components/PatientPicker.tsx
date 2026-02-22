@@ -39,20 +39,18 @@ export default function PatientPicker({
 
   if (showNewForm) {
     return (
-      <div
-        className="relative flex min-h-screen flex-col items-center justify-center bg-slate-50 overflow-y-auto px-4 py-10 sm:px-6 sm:py-16"
-        style={{ fontFamily: "Inter, system-ui, sans-serif" }}
-      >
+      <div className="relative flex min-h-screen flex-col items-center justify-center bg-slate-50 overflow-y-auto px-4 py-10 sm:px-6 sm:py-16 font-sans">
         <button
           onClick={() => setShowNewForm(false)}
-          className="absolute left-6 top-6 flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-500"
+          className="absolute left-6 top-6 flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-500 transition hover:bg-slate-50"
         >
-          <ArrowLeft size={16} /> Back
+          <ArrowLeft size={16} />
+          Back
         </button>
 
-        <div className="w-full max-w-sm rounded-[20px] border border-gray-200 bg-white px-12 py-10 shadow-sm">
-          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-700 to-pink-600">
-            <UserPlus size={28} color="#fff" />
+        <div className="w-full max-w-sm rounded-[20px] border border-slate-200 bg-white px-12 py-10 shadow-sm">
+          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-700 to-pink-600 shadow-[0_8px_16px_rgba(190,24,93,0.2),inset_0_2px_4px_rgba(255,255,255,0.3)]">
+            <UserPlus size={28} className="text-white" />
           </div>
 
           <h2 className="mb-2 text-[22px] font-bold text-slate-900">
@@ -69,12 +67,12 @@ export default function PatientPicker({
             onKeyDown={(e) => e.key === "Enter" && submitNew()}
             placeholder="Your name"
             autoFocus
-            className="mb-5 w-full rounded-xl border border-gray-200 px-[18px] py-[14px] text-base text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-pink-700 focus:ring-[3px] focus:ring-pink-700/10"
+            className="mb-5 w-full rounded-xl border border-slate-200 px-[18px] py-[14px] text-base text-slate-900 outline-none transition focus:border-pink-700 focus:ring-4 focus:ring-pink-700/10"
           />
 
           <button
             onClick={submitNew}
-            className="w-full cursor-pointer rounded-xl border-none bg-gradient-to-br from-pink-700 to-pink-600 py-[14px] text-[15px] font-semibold text-white"
+            className="w-full rounded-xl bg-gradient-to-br from-pink-700 to-pink-600 py-[14px] text-[15px] font-semibold text-white transition hover:opacity-95"
           >
             Continue
           </button>
@@ -84,15 +82,13 @@ export default function PatientPicker({
   }
 
   return (
-    <div
-      className="relative flex h-screen flex-col items-center justify-center bg-slate-50 p-6"
-      style={{ fontFamily: "Inter, system-ui, sans-serif" }}
-    >
+    <div className="relative flex h-screen flex-col items-center justify-center bg-slate-50 p-6 font-sans">
       <button
         onClick={onBack}
-        className="absolute left-6 top-6 flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-500"
+        className="absolute left-6 top-6 flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-500 transition hover:bg-slate-50"
       >
-        <ArrowLeft size={16} /> Back
+        <ArrowLeft size={16} />
+        Back
       </button>
 
       <div className="mb-8 text-center">
@@ -109,7 +105,7 @@ export default function PatientPicker({
           <button
             key={p.id}
             onClick={() => selectExisting(p)}
-            className="flex cursor-pointer items-center gap-4 rounded-2xl border border-gray-200 bg-white px-5 py-[18px] text-left shadow-sm transition-all duration-200 hover:border-pink-200 hover:shadow-[0_4px_12px_rgba(190,24,93,0.08)]"
+            className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-[18px] text-left shadow-sm transition-all duration-200 hover:border-pink-200 hover:shadow-[0_4px_12px_rgba(190,24,93,0.08)]"
           >
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-pink-50 text-base font-bold text-pink-700">
               {p.name
@@ -118,18 +114,16 @@ export default function PatientPicker({
                 .join("")}
             </div>
             <div className="flex-1">
-              <p className="m-0 text-base font-semibold text-slate-900">
-                {p.name}
-              </p>
+              <p className="text-base font-semibold text-slate-900">{p.name}</p>
               <p className="mt-0.5 text-xs text-slate-500">{p.condition}</p>
             </div>
-            <ChevronRight size={20} color="#94a3b8" />
+            <ChevronRight size={20} className="text-slate-400" />
           </button>
         ))}
 
         <button
           onClick={() => setShowNewForm(true)}
-          className="flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-gray-200 bg-white px-8 py-4 text-[15px] font-semibold text-slate-500 transition-all duration-200 hover:border-pink-700 hover:bg-pink-50 hover:text-pink-700"
+          className="flex w-full items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-slate-200 bg-white px-8 py-4 text-[15px] font-semibold text-slate-500 transition-all duration-200 hover:border-pink-700 hover:bg-pink-50 hover:text-pink-700"
         >
           <UserPlus size={20} />
           I'm a new patient

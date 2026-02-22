@@ -17,69 +17,20 @@ export default function Sidebar({
   onTabChange,
   onLogout,
 }: SidebarProps) {
+  const isClinician = role === "clinician";
+
   return (
-    <aside
-      style={{
-        width: 240, // Slightly wider for a more modern feel
-        height: "100vh",
-        backgroundColor: "#fff",
-        borderRight: "1px solid #f1f5f9", // Softer border
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        boxShadow: "4px 0 24px rgba(0,0,0,0.01)", // Very subtle shadow
-        zIndex: 20,
-      }}
-    >
+    <aside className="w-60 h-screen bg-white border-r border-slate-100 flex flex-col overflow-hidden shadow-[4px_0_24px_rgba(0,0,0,0.01)] z-20">
       {/* Logo Area */}
-      <div
-        style={{
-          padding: "24px",
-          borderBottom: "1px solid #f1f5f9",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          width: "100%",
-          boxSizing: "border-box",
-        }}
-      >
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            background: "linear-gradient(135deg, #be185d 0%, #db2777 100%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow:
-              "0 4px 8px rgba(190, 24, 93, 0.2), inset 0 2px 4px rgba(255,255,255,0.3)",
-            flexShrink: 0,
-          }}
-        >
-          <Sparkles size={18} color="#fff" />
+      <div className="p-6 border-b border-slate-100 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pink-700 to-pink-600 flex items-center justify-center shadow-[0_4px_8px_rgba(190,24,93,0.2),inset_0_2px_4px_rgba(255,255,255,0.3)]">
+          <Sparkles size={18} className="text-white" />
         </div>
         <div>
-          <span
-            style={{
-              fontWeight: 700,
-              fontSize: 18,
-              color: "#1f2937",
-              letterSpacing: "-0.02em",
-              display: "block",
-            }}
-          >
+          <span className="block font-bold text-lg text-slate-800 tracking-tight">
             Vitality
           </span>
-          <span
-            style={{
-              fontSize: 11,
-              color: "#94a3b8",
-              fontWeight: 500,
-              letterSpacing: "0.02em",
-              textTransform: "uppercase",
-            }}
-          >
+          <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">
             Health Engine
           </span>
         </div>
@@ -87,19 +38,12 @@ export default function Sidebar({
 
       {/* Role Badge */}
       <div
-        style={{
-          margin: "20px 16px 0",
-          padding: "8px 12px",
-          borderRadius: 8,
-          backgroundColor: role === "clinician" ? "#eff6ff" : "#fdf2f8", // Blue for doc, Pink for patient
-          border: `1px solid ${role === "clinician" ? "#bfdbfe" : "#fbcfe8"}`,
-          fontSize: 11,
-          fontWeight: 700,
-          color: role === "clinician" ? "#1e40af" : "#be185d",
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          textAlign: "center",
-        }}
+        className={`mx-4 mt-5 px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center border
+        ${
+          isClinician
+            ? "bg-blue-50 border-blue-200 text-blue-800"
+            : "bg-pink-50 border-pink-200 text-pink-700"
+        }`}
       >
         {role} Portal
       </div>
@@ -107,29 +51,11 @@ export default function Sidebar({
       {role === "patient" && <ProfileSelector />}
 
       {/* Nav Tabs */}
-      <nav
-        style={{
-          flex: 1,
-          padding: "16px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-          minHeight: 0,
-          overflowY: "auto",
-        }}
-      >
-        <p
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: "#94a3b8",
-            textTransform: "uppercase",
-            margin: "0 0 8px 8px",
-            letterSpacing: "0.02em",
-          }}
-        >
+      <nav className="flex-1 p-4 flex flex-col gap-1 min-h-0 overflow-y-auto">
+        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2 ml-2">
           Menu
         </p>
+
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = active === tab.id;
@@ -138,37 +64,21 @@ export default function Sidebar({
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: "none",
-                cursor: "pointer",
-                fontSize: 14,
-                fontWeight: isActive ? 600 : 500,
-                backgroundColor: isActive ? "#fdf2f8" : "transparent",
-                color: isActive ? "#be185d" : "#64748b",
-                transition: "all 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = "#f8fafc";
-                  e.currentTarget.style.color = "#334155";
+              className={`
+                flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm
+                transition-all duration-150
+                ${
+                  isActive
+                    ? "bg-pink-50 text-pink-700 font-semibold"
+                    : "text-slate-500 font-medium hover:bg-slate-50 hover:text-slate-700"
                 }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = "trans parent";
-                  e.currentTarget.style.color = "#64748b";
-                }
-              }}
+              `}
             >
               <Icon
                 size={18}
-                color={isActive ? "#be185d" : "#94a3b8"}
-                style={{ transition: "all 0.15s ease" }}
+                className={`transition-all duration-150 ${
+                  isActive ? "text-pink-700" : "text-slate-400"
+                }`}
               />
               {tab.label}
             </button>
@@ -177,41 +87,14 @@ export default function Sidebar({
       </nav>
 
       {/* Switch Role / Logout */}
-      <div style={{ padding: "16px", borderTop: "1px solid #f1f5f9" }}>
+      <div className="p-4 border-t border-slate-100">
         <button
           onClick={onLogout}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            width: "100%",
-            padding: "12px 14px",
-            borderRadius: 10,
-            border: "none",
-            cursor: "pointer",
-            fontSize: 13,
-            fontWeight: 500,
-            color: "#64748b",
-            backgroundColor: "transparent",
-            transition: "all 0.15s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#fee2e2";
-            e.currentTarget.style.color = "#ef4444";
-            const svg = e.currentTarget.querySelector("svg");
-            if (svg) svg.style.color = "#ef4444";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "transparent";
-            e.currentTarget.style.color = "#64748b";
-            const svg = e.currentTarget.querySelector("svg");
-            if (svg) svg.style.color = "#94a3b8";
-          }}
+          className="group flex items-center gap-2.5 w-full px-3.5 py-3 rounded-xl text-sm font-medium text-slate-500 hover:bg-red-50 hover:text-red-500 transition-all duration-150"
         >
           <LogOut
             size={16}
-            color="#94a3b8"
-            style={{ transition: "all 0.15s ease" }}
+            className="text-slate-400 group-hover:text-red-500 transition-all duration-150"
           />
           Switch Role
         </button>
