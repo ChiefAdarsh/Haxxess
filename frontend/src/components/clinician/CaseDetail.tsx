@@ -61,61 +61,25 @@ export default function CaseDetail({ patient, onBack }: CaseDetailProps) {
     <div>
       <button
         onClick={onBack}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          border: "none",
-          backgroundColor: "transparent",
-          cursor: "pointer",
-          fontSize: 13,
-          color: "#64748b",
-          fontWeight: 500,
-          marginBottom: 20,
-          padding: 0,
-          transition: "color 0.2s",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.color = "#0f172a")}
-        onMouseLeave={(e) => (e.currentTarget.style.color = "#64748b")}
+        className="flex items-center gap-1.5 text-sm font-medium text-slate-400 mb-5 p-0 transition-colors hover:text-slate-900"
       >
         <ArrowLeft size={16} /> Back to Triage Queue
       </button>
 
-      {/* Patient Header + AI Triage Alert */}
       <div
-        style={{
-          backgroundColor: isCritical ? "#fffbfe" : cfg.bg,
-          borderRadius: 16,
-          border: `1px solid ${isCritical ? "#fbcfe8" : cfg.color + "30"}`,
-          padding: "24px",
-          marginBottom: 24,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          boxShadow: isCritical
-            ? "0 8px 24px -4px rgba(190, 24, 93, 0.1)"
-            : "0 4px 6px -1px rgba(0,0,0,0.02)",
-        }}
+        className={`flex justify-between items-start p-6 mb-6 rounded-2xl border ${
+          isCritical
+            ? "bg-pink-50 border-pink-200 shadow-[0_8px_24px_-4px_rgba(190,24,93,0.1)]"
+            : `bg-[${cfg.bg}] border-[${cfg.color}30] shadow-sm`
+        }`}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          {/* Avatar */}
+        <div className="flex items-center gap-4">
           <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 28,
-              backgroundColor: "#fff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 700,
-              fontSize: 20,
-              color: isCritical ? "#be185d" : "#475569",
-              border: `3px solid ${isCritical ? "#be185d" : cfg.color}`,
-              boxShadow: isCritical
-                ? "0 0 16px rgba(190, 24, 93, 0.2)"
-                : "none",
-            }}
+            className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-lg border-4 ${
+              isCritical
+                ? "border-pink-700 text-pink-700 shadow-[0_0_16px_rgba(190,24,93,0.2)]"
+                : `border-[${cfg.color}] text-slate-700`
+            } bg-white`}
           >
             {patient.name
               .split(" ")
@@ -123,154 +87,46 @@ export default function CaseDetail({ patient, onBack }: CaseDetailProps) {
               .join("")}
           </div>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <h2
-                style={{
-                  fontSize: 22,
-                  fontWeight: 700,
-                  color: "#1e293b",
-                  margin: 0,
-                  letterSpacing: "-0.02em",
-                }}
-              >
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight m-0">
                 {patient.name}
               </h2>
               <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  padding: "4px 10px",
-                  borderRadius: 20,
-                  backgroundColor: isCritical ? "#be185d" : "#fff",
-                  color: isCritical ? "#fff" : cfg.color,
-                  border: isCritical ? "none" : `1px solid ${cfg.color}`,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
+                className={`text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 uppercase tracking-wide ${
+                  isCritical
+                    ? "bg-pink-700 text-white"
+                    : `bg-white text-[${cfg.color}] border border-[${cfg.color}]`
+                }`}
               >
                 {isCritical && <Sparkles size={12} />}
                 {cfg.label} Level Alert
               </span>
             </div>
-            <p
-              style={{
-                fontSize: 14,
-                color: "#64748b",
-                margin: "4px 0 0",
-                fontWeight: 500,
-              }}
-            >
+            <p className="text-sm text-slate-400 mt-1 font-medium">
               Age {patient.age} &middot; Multimodal Anomaly Detected
             </p>
           </div>
         </div>
 
-        {/* Call to Action */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "10px 18px",
-              borderRadius: 8,
-              border: "none",
-              background: "linear-gradient(135deg, #be185d 0%, #db2777 100%)",
-              cursor: "pointer",
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#fff",
-              boxShadow: "0 4px 12px rgba(190, 24, 93, 0.25)",
-              transition: "transform 0.15s, box-shadow 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-1px)";
-              e.currentTarget.style.boxShadow =
-                "0 6px 16px rgba(190, 24, 93, 0.35)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow =
-                "0 4px 12px rgba(190, 24, 93, 0.25)";
-            }}
-          >
-            <Phone size={16} /> Urgent Telehealth Call
-          </button>
-        </div>
+        <button className="flex items-center gap-2.5 px-4 py-2 rounded-lg text-white font-semibold text-sm bg-gradient-to-tr from-pink-700 to-pink-600 shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg">
+          <Phone size={16} /> Urgent Telehealth Call
+        </button>
       </div>
 
-      {/* AI Red-Flag Reasoning */}
-      <div
-        style={{
-          backgroundColor: "#fff",
-          borderRadius: 16,
-          border: "1px solid #f1f5f9",
-          padding: "24px",
-          marginBottom: 20,
-          boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            marginBottom: 16,
-          }}
-        >
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              backgroundColor: "#fef2f2",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 mb-5 shadow-sm">
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
             <AlertTriangle size={18} color="#e11d48" />
           </div>
-          <h3
-            style={{
-              fontSize: 16,
-              fontWeight: 700,
-              color: "#1e293b",
-              margin: 0,
-              letterSpacing: "-0.01em",
-            }}
-          >
+          <h3 className="text-base font-bold text-slate-900 tracking-tight m-0">
             Vitality AI Triage Reasoning
           </h3>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="flex flex-col gap-2.5">
           {mockCase.reasons.map((r, i) => (
-            <div
-              key={i}
-              style={{ display: "flex", gap: 10, alignItems: "flex-start" }}
-            >
-              <div
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: "#e11d48",
-                  marginTop: 8,
-                  flexShrink: 0,
-                }}
-              />
-              <p
-                style={{
-                  fontSize: 14,
-                  color: "#334155",
-                  margin: 0,
-                  lineHeight: 1.5,
-                  fontWeight: 500,
-                }}
-              >
+            <div key={i} className="flex gap-2.5 items-start">
+              <div className="w-1.5 h-1.5 rounded-full bg-red-600 mt-2 flex-shrink-0" />
+              <p className="text-sm text-slate-800 font-medium leading-relaxed m-0">
                 {r}
               </p>
             </div>
@@ -278,78 +134,27 @@ export default function CaseDetail({ patient, onBack }: CaseDetailProps) {
         </div>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 20,
-          marginBottom: 20,
-        }}
-      >
-        {/* NLP Transcript Summary */}
-        <div
-          style={{
-            backgroundColor: "#fff",
-            borderRadius: 16,
-            border: "1px solid #f1f5f9",
-            padding: "24px",
-            boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              marginBottom: 16,
-            }}
-          >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                backgroundColor: "#eff6ff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+      <div className="grid grid-cols-2 gap-5 mb-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
               <FileText size={18} color="#3b82f6" />
             </div>
-            <h3
-              style={{
-                fontSize: 16,
-                fontWeight: 700,
-                color: "#1e293b",
-                margin: 0,
-                letterSpacing: "-0.01em",
-              }}
-            >
+            <h3 className="text-base font-bold text-slate-900 tracking-tight m-0">
               Voice Journal Transcript
             </h3>
           </div>
-          <div
-            style={{
-              backgroundColor: "#f8fafc",
-              padding: "16px",
-              borderRadius: 12,
-              border: "1px solid #e2e8f0",
-            }}
-          >
+          <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
             {mockCase.transcript.map((line, i) => {
               const isMeta = line.startsWith("[");
               return (
                 <p
                   key={i}
-                  style={{
-                    fontSize: 13,
-                    color: isMeta ? "#94a3b8" : "#334155",
-                    margin: "6px 0",
-                    lineHeight: 1.6,
-                    fontStyle: isMeta ? "italic" : "normal",
-                    fontWeight: isMeta ? 600 : 400,
-                  }}
+                  className={`text-sm leading-6 my-1.5 ${
+                    isMeta
+                      ? "text-slate-400 italic font-semibold"
+                      : "text-slate-800 font-normal"
+                  }`}
                 >
                   {line}
                 </p>
@@ -358,83 +163,33 @@ export default function CaseDetail({ patient, onBack }: CaseDetailProps) {
           </div>
         </div>
 
-        {/* Extracted Multimodal Data */}
-        <div
-          style={{
-            backgroundColor: "#fff",
-            borderRadius: 16,
-            border: "1px solid #f1f5f9",
-            padding: "24px",
-            boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              marginBottom: 16,
-            }}
-          >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                backgroundColor: "#f0fdf4",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
               <Activity size={18} color="#10b981" />
             </div>
-            <h3
-              style={{
-                fontSize: 16,
-                fontWeight: 700,
-                color: "#1e293b",
-                margin: 0,
-                letterSpacing: "-0.01em",
-              }}
-            >
+            <h3 className="text-base font-bold text-slate-900 tracking-tight m-0">
               Fused Telemetry Data
             </h3>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="flex flex-col gap-3">
             {Object.entries(mockCase.entities).map(([key, val]) => (
               <div
                 key={key}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  paddingBottom: 10,
-                  borderBottom: "1px solid #f1f5f9",
-                }}
+                className="flex justify-between border-b border-slate-100 pb-2.5"
               >
-                <span
-                  style={{
-                    fontSize: 13,
-                    color: "#64748b",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    fontWeight: 600,
-                  }}
-                >
+                <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
                   {key.replace("_", " ")}
                 </span>
                 <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color:
-                      val.includes("Critical") ||
-                      val.includes("+1.4") ||
-                      val.includes("High")
-                        ? "#be185d"
-                        : "#1e293b",
-                  }}
+                  className={`text-sm font-semibold ${
+                    val.includes("Critical") ||
+                    val.includes("+1.4") ||
+                    val.includes("High")
+                      ? "text-pink-700"
+                      : "text-slate-900"
+                  }`}
                 >
                   {val}
                 </span>
@@ -442,55 +197,17 @@ export default function CaseDetail({ patient, onBack }: CaseDetailProps) {
             ))}
           </div>
 
-          {/* Severity Trend */}
-          <div
-            style={{
-              marginTop: 20,
-              padding: "16px",
-              borderRadius: 12,
-              backgroundColor: "#fffbfe",
-              border: "1px solid #fbcfe8",
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-            }}
-          >
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: "#fdf2f8",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+          <div className="flex items-center gap-3.5 mt-5 p-4 bg-pink-50 border border-pink-200 rounded-lg">
+            <div className="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center">
               <TrendingUp size={20} color="#be185d" />
             </div>
             <div>
-              <p
-                style={{
-                  fontSize: 11,
-                  color: "#be185d",
-                  fontWeight: 700,
-                  margin: 0,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
+              <p className="text-[11px] font-bold text-pink-700 uppercase tracking-wide m-0">
                 Severity Trend
               </p>
-              <p
-                style={{
-                  fontSize: 14,
-                  color: "#1e293b",
-                  margin: "4px 0 0",
-                  fontWeight: 600,
-                }}
-              >
+              <p className="text-sm font-semibold text-slate-900 mt-1">
                 Baseline {mockCase.trend.baseline}/10 → Current{" "}
-                <span style={{ color: "#be185d", fontWeight: 800 }}>
+                <span className="text-pink-700 font-extrabold">
                   {mockCase.trend.current}/10
                 </span>
               </p>
@@ -499,70 +216,20 @@ export default function CaseDetail({ patient, onBack }: CaseDetailProps) {
         </div>
       </div>
 
-      {/* Suggested Next Steps */}
-      <div
-        style={{
-          backgroundColor: "#fff",
-          borderRadius: 16,
-          border: "1px solid #f1f5f9",
-          padding: "24px",
-          boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02)",
-        }}
-      >
-        <h3
-          style={{
-            fontSize: 14,
-            fontWeight: 700,
-            color: "#94a3b8",
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-            margin: "0 0 16px",
-          }}
-        >
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-4">
           Suggested Protocols (Non-Diagnostic)
         </h3>
-        <div
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
-        >
+        <div className="grid grid-cols-2 gap-4">
           {mockCase.nextSteps.map((step, i) => (
             <div
               key={i}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 12,
-                padding: "16px",
-                borderRadius: 12,
-                backgroundColor: "#f8fafc",
-                border: "1px solid #e2e8f0",
-              }}
+              className="flex items-start gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg"
             >
-              <span
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 6,
-                  backgroundColor: "#e2e8f0",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#475569",
-                  flexShrink: 0,
-                }}
-              >
+              <span className="w-6 h-6 rounded-md bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-700 flex-shrink-0">
                 {i + 1}
               </span>
-              <p
-                style={{
-                  fontSize: 14,
-                  color: "#334155",
-                  margin: 0,
-                  fontWeight: 500,
-                  lineHeight: 1.4,
-                }}
-              >
+              <p className="text-sm text-slate-800 font-medium leading-snug m-0">
                 {step}
               </p>
             </div>

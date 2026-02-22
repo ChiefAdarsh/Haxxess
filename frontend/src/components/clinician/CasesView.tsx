@@ -93,63 +93,40 @@ export default function CasesView({ onSelectPatient }: CasesViewProps) {
 
   const online = !!status;
   const vitality = status?.vitality;
-  const flags = vitality?.flags || [];
+  const flags = (vitality?.flags || []).filter(
+    (f: string) =>
+      ![
+        "[voice] No voice data available",
+        "[nlp] NLP module not connected",
+        "[behavioral] Behavioral module not connected",
+      ].includes(f),
+  );
 
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-        }}
-      >
+    <div className="space-y-6">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h2
-            style={{
-              fontSize: 22,
-              fontWeight: 700,
-              color: "#1e293b",
-              margin: 0,
-              letterSpacing: "-0.02em",
-            }}
-          >
+          <h2 className="text-[22px] font-bold text-slate-900 leading-tight">
             Cases
           </h2>
-          <p
-            style={{
-              fontSize: 14,
-              color: "#64748b",
-              margin: "4px 0 0",
-              fontWeight: 500,
-            }}
-          >
+          <p className="text-sm font-medium text-slate-400 mt-1">
             Pipeline status and patient case list
           </p>
         </div>
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 14px",
-            borderRadius: 10,
-            backgroundColor: online ? "#f0fdf4" : "#f8fafc",
-            border: `1px solid ${online ? "#bbf7d0" : "#e2e8f0"}`,
-          }}
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${
+            online
+              ? "bg-green-50 border-green-200"
+              : "bg-slate-50 border-slate-200"
+          }`}
         >
           {online ? (
-            <Wifi size={14} color="#10b981" />
+            <Wifi size={14} className="text-green-600" />
           ) : (
-            <WifiOff size={14} color="#94a3b8" />
+            <WifiOff size={14} className="text-slate-400" />
           )}
           <span
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: online ? "#15803d" : "#64748b",
-            }}
+            className={`text-xs font-semibold ${online ? "text-green-700" : "text-slate-400"}`}
           >
             {online ? "Pipeline Live" : "Pipeline Offline"}
           </span>
@@ -157,141 +134,52 @@ export default function CasesView({ onSelectPatient }: CasesViewProps) {
       </div>
 
       {loading ? (
-        <div
-          style={{
-            padding: 48,
-            textAlign: "center",
-            backgroundColor: "#fff",
-            borderRadius: 16,
-            border: "1px solid #f1f5f9",
-          }}
-        >
-          <p style={{ fontSize: 14, color: "#94a3b8", margin: 0 }}>
+        <div className="p-12 text-center bg-white rounded-xl border border-slate-100">
+          <p className="text-sm text-slate-400 m-0">
             Loading pipeline status...
           </p>
         </div>
       ) : online && (vitality || alert) ? (
-        <div
-          style={{
-            backgroundColor: "#fff",
-            borderRadius: 16,
-            border: "1px solid #f1f5f9",
-            padding: 24,
-            marginBottom: 24,
-            boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              marginBottom: 16,
-            }}
-          >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                background: "linear-gradient(135deg, #be185d 0%, #db2777 100%)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Activity size={18} color="#fff" />
+        <div className="bg-white rounded-xl border border-slate-100 p-6 mb-6 shadow-sm">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-pink-700 to-pink-600 flex items-center justify-center">
+              <Activity size={18} className="text-white" />
             </div>
-            <h3
-              style={{
-                fontSize: 16,
-                fontWeight: 700,
-                color: "#1e293b",
-                margin: 0,
-              }}
-            >
+            <h3 className="text-sm font-bold text-slate-900 m-0">
               Live pipeline snapshot
             </h3>
           </div>
-          <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}
-          >
+          <div className="grid grid-cols-2 gap-5">
             <div>
-              <p
-                style={{
-                  fontSize: 12,
-                  color: "#94a3b8",
-                  margin: "0 0 4px",
-                  textTransform: "uppercase",
-                  fontWeight: 600,
-                }}
-              >
+              <p className="text-xs font-semibold uppercase text-slate-400 m-0">
                 Vitality
               </p>
-              <p
-                style={{
-                  fontSize: 24,
-                  fontWeight: 800,
-                  color: "#1e293b",
-                  margin: 0,
-                }}
-              >
+              <p className="text-2xl font-extrabold text-slate-900 m-0">
                 {vitality?.index ?? "—"}
               </p>
-              <p style={{ fontSize: 13, color: "#64748b", margin: "4px 0 0" }}>
+              <p className="text-sm text-slate-400 mt-1">
                 {vitality?.tier_label ?? "—"} · {status?.cycle_state ?? "—"}
               </p>
             </div>
             <div>
-              <p
-                style={{
-                  fontSize: 12,
-                  color: "#94a3b8",
-                  margin: "0 0 4px",
-                  textTransform: "uppercase",
-                  fontWeight: 600,
-                }}
-              >
+              <p className="text-xs font-semibold uppercase text-slate-400 m-0">
                 Summary
               </p>
-              <p
-                style={{
-                  fontSize: 13,
-                  color: "#475569",
-                  margin: 0,
-                  lineHeight: 1.5,
-                }}
-              >
+              <p className="text-sm text-slate-700 mt-0">
                 {vitality?.summary || "No summary"}
               </p>
             </div>
           </div>
           {flags.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <p
-                style={{
-                  fontSize: 12,
-                  color: "#94a3b8",
-                  margin: "0 0 8px",
-                  textTransform: "uppercase",
-                  fontWeight: 600,
-                }}
-              >
+            <div className="mt-4">
+              <p className="text-xs font-semibold uppercase text-slate-400 mb-2">
                 Active flags
               </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div className="flex flex-wrap gap-2">
                 {flags.slice(0, 5).map((f: string, i: number) => (
                   <span
                     key={i}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: 8,
-                      backgroundColor: "#fef2f2",
-                      border: "1px solid #fecaca",
-                      fontSize: 12,
-                      color: "#991b1b",
-                      fontWeight: 500,
-                    }}
+                    className="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-900 text-xs font-medium"
                   >
                     {f}
                   </span>
@@ -301,67 +189,40 @@ export default function CasesView({ onSelectPatient }: CasesViewProps) {
           )}
           {alert && (
             <div
-              style={{
-                marginTop: 16,
-                padding: 14,
-                borderRadius: 12,
-                backgroundColor:
-                  alert.severity === "critical" ? "#fef2f2" : "#fffbeb",
-                border: `1px solid ${alert.severity === "critical" ? "#fecaca" : "#fde68a"}`,
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 10,
-              }}
+              className={`mt-4 p-3.5 rounded-xl flex items-start gap-2 border ${
+                alert.severity === "critical"
+                  ? "bg-red-50 border-red-200"
+                  : "bg-yellow-50 border-yellow-200"
+              }`}
             >
               <AlertTriangle
                 size={18}
-                color={alert.severity === "critical" ? "#dc2626" : "#f59e0b"}
-                style={{ flexShrink: 0, marginTop: 2 }}
+                className={
+                  alert.severity === "critical"
+                    ? "text-red-600"
+                    : "text-yellow-600"
+                }
               />
               <div>
-                <p
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#1e293b",
-                    margin: 0,
-                  }}
-                >
+                <p className="text-sm font-semibold text-slate-900 m-0">
                   {alert.title || "Alert"}
                 </p>
-                <p
-                  style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}
-                >
+                <p className="text-xs text-slate-400 mt-1">
                   {alert.message || alert.summary || ""}
                 </p>
               </div>
             </div>
           )}
           {forecast?.forecast?.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <p
-                style={{
-                  fontSize: 12,
-                  color: "#94a3b8",
-                  margin: "0 0 8px",
-                  textTransform: "uppercase",
-                  fontWeight: 600,
-                }}
-              >
+            <div className="mt-4">
+              <p className="text-xs font-semibold uppercase text-slate-400 mb-2">
                 72h forecast (next interval)
               </p>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div className="flex flex-wrap gap-2">
                 {forecast.forecast.slice(0, 3).map((f: any, i: number) => (
                   <span
                     key={i}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: 8,
-                      backgroundColor: "#f8fafc",
-                      border: "1px solid #e2e8f0",
-                      fontSize: 12,
-                      color: "#475569",
-                    }}
+                    className="px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-700"
                   >
                     +{f.hour}h: {f.predicted_score} — {f.risk_factor}
                   </span>
@@ -372,36 +233,14 @@ export default function CasesView({ onSelectPatient }: CasesViewProps) {
         </div>
       ) : null}
 
-      <div
-        style={{
-          backgroundColor: "#fff",
-          borderRadius: 16,
-          border: "1px solid #f1f5f9",
-          padding: 24,
-          boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            marginBottom: 20,
-          }}
-        >
-          <FileText size={20} color="#be185d" />
-          <h3
-            style={{
-              fontSize: 16,
-              fontWeight: 700,
-              color: "#1e293b",
-              margin: 0,
-            }}
-          >
+      <div className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm">
+        <div className="flex items-center gap-2.5 mb-5">
+          <FileText size={20} className="text-pink-700" />
+          <h3 className="text-sm font-bold text-slate-900 m-0">
             Patient cases
           </h3>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="flex flex-col gap-3">
           {mockCases.map((c) => {
             const cfg = triageLevelConfig[c.level];
             const isCritical = c.level === "emergency";
@@ -409,94 +248,36 @@ export default function CasesView({ onSelectPatient }: CasesViewProps) {
               <button
                 key={c.id}
                 onClick={() => onSelectPatient(c.patient)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 16,
-                  padding: "16px 20px",
-                  borderRadius: 12,
-                  border: isCritical
-                    ? "1px solid #fbcfe8"
-                    : "1px solid #f1f5f9",
-                  backgroundColor: isCritical ? "#fffbfe" : "#fff",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  transition: "all 0.2s",
-                  borderLeft: `4px solid ${isCritical ? "#be185d" : cfg.color}`,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f8fafc";
-                  e.currentTarget.style.borderColor = "#e2e8f0";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = isCritical
-                    ? "#fffbfe"
-                    : "#fff";
-                  e.currentTarget.style.borderColor = isCritical
-                    ? "#fbcfe8"
-                    : "#f1f5f9";
-                }}
+                className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer text-left transition-all border-l-4 ${
+                  isCritical
+                    ? "border-pink-700 bg-pink-50 hover:bg-slate-50 hover:border-slate-200"
+                    : `border-l-[${cfg.color}] bg-white hover:bg-slate-50 hover:border-slate-200`
+                }`}
               >
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    backgroundColor: "#f8fafc",
-                    border: "1px solid #e2e8f0",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 700,
-                    fontSize: 14,
-                    color: "#475569",
-                    flexShrink: 0,
-                  }}
-                >
+                <div className="w-11 h-11 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-700 font-bold text-sm flex-shrink-0">
                   {c.patient.name
                     .split(" ")
                     .map((n) => n[0])
                     .join("")}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 10 }}
-                  >
-                    <span
-                      style={{
-                        fontWeight: 600,
-                        fontSize: 15,
-                        color: "#1e293b",
-                      }}
-                    >
+                <div className="flex-1">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-sm font-semibold text-slate-900">
                       {c.patient.name}
                     </span>
                     <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        padding: "4px 10px",
-                        borderRadius: 6,
-                        backgroundColor: isCritical ? "#be185d" : cfg.bg,
-                        color: isCritical ? "#fff" : cfg.color,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}
+                      className={`text-xs font-bold px-2.5 py-1 rounded ${
+                        isCritical
+                          ? "bg-pink-700 text-white"
+                          : `${cfg.bg} ${cfg.color}`
+                      } uppercase tracking-wide`}
                     >
                       {cfg.label}
                     </span>
                   </div>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      color: "#64748b",
-                      margin: "4px 0 0",
-                    }}
-                  >
-                    {c.summary}
-                  </p>
+                  <p className="text-sm text-slate-400 mt-1">{c.summary}</p>
                 </div>
-                <ChevronRight size={18} color="#94a3b8" />
+                <ChevronRight size={18} className="text-slate-400" />
               </button>
             );
           })}

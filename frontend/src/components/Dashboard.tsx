@@ -147,11 +147,11 @@ export default function Dashboard({ role, onLogout }: DashboardProps) {
 
           <div className="flex items-center gap-4">
             <span className="text-xs font-medium text-pink-200">
-              {role === "clinician" ? "Dr. Priti" : "See Your Vitality Portal"}
+              {role === "clinician" ? "Dr. See" : "See Your Vitality Portal"}
             </span>
 
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-50 text-sm font-bold text-pink-800">
-              {role === "clinician" ? "SM" : patientInitials}
+              {role === "clinician" ? "PS" : patientInitials}
             </div>
           </div>
         </header>

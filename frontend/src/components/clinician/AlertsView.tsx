@@ -100,8 +100,7 @@ export default function AlertsView() {
         const res = await getSmartAlert();
         if (cancelled || !res?.data) return;
         setBackendConnected(true);
-        const existing = alerts.find((a) => a.id === "live-backend");
-        if (!existing && res.data.title) {
+        if (!alerts.find((a) => a.id === "live-backend") && res.data.title) {
           const liveAlert: Alert = {
             id: "live-backend",
             patient: patients[0],
@@ -123,99 +122,49 @@ export default function AlertsView() {
     };
   }, []);
 
-  const acknowledge = (id: string) => {
+  const acknowledge = (id: string) =>
     setAlerts(
       alerts.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)),
     );
-  };
 
   const active = alerts.filter((a) => !a.acknowledged);
   const resolved = alerts.filter((a) => a.acknowledged);
 
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 24,
-        }}
-      >
+    <div className="space-y-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <h2
-              style={{
-                fontSize: 22,
-                fontWeight: 700,
-                color: "#1e293b",
-                margin: 0,
-                letterSpacing: "-0.02em",
-              }}
-            >
+          <div className="flex items-center gap-3">
+            <h2 className="text-[22px] font-bold text-slate-900 -tracking-[0.02em]">
               Vitality Live Alerts
             </h2>
             {active.length > 0 && (
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  padding: "4px 12px",
-                  borderRadius: 20,
-                  backgroundColor: "#fdf2f8",
-                  color: "#be185d",
-                  border: "1px solid #fbcfe8",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  letterSpacing: "0.05em",
-                  textTransform: "uppercase",
-                }}
-              >
+              <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full uppercase bg-pink-50 text-pink-700 border border-pink-200">
                 <Sparkles size={12} /> {active.length} Active Flags
               </span>
             )}
           </div>
-          <p
-            style={{
-              fontSize: 13,
-              color: "#64748b",
-              margin: "4px 0 0",
-              fontWeight: 500,
-            }}
-          >
+          <p className="mt-1 text-xs text-slate-500 font-medium">
             Continuous telemetry and AI triage notifications
           </p>
         </div>
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "6px 12px",
-            borderRadius: 8,
-            backgroundColor: backendConnected ? "#f0fdf4" : "#f8fafc",
-            border: `1px solid ${backendConnected ? "#bbf7d0" : "#e2e8f0"}`,
-          }}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border ${backendConnected ? "bg-green-50 border-green-200" : "bg-slate-50 border-slate-200"}`}
         >
           {backendConnected ? (
-            <Wifi size={12} color="#10b981" />
+            <Wifi size={12} className="text-green-500" />
           ) : (
-            <WifiOff size={12} color="#94a3b8" />
+            <WifiOff size={12} className="text-slate-400" />
           )}
           <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: backendConnected ? "#15803d" : "#94a3b8",
-            }}
+            className={`text-[11px] font-semibold ${backendConnected ? "text-green-800" : "text-slate-400"}`}
           >
             {backendConnected ? "Live Feed" : "Mock Data"}
           </span>
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="flex flex-col gap-4">
         {active.map((alert) => {
           const Icon = iconMap[alert.icon];
           const cfg = triageLevelConfig[alert.level];
@@ -224,152 +173,50 @@ export default function AlertsView() {
           return (
             <div
               key={alert.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 16,
-                padding: "20px 24px",
-                borderRadius: 16,
-                backgroundColor: isCritical ? "#fffbfe" : "#fff",
-                border: isCritical ? "1px solid #fbcfe8" : "1px solid #f1f5f9",
-                borderLeft: `4px solid ${isCritical ? "#be185d" : cfg.color}`,
-                boxShadow: isCritical
-                  ? "0 8px 24px -4px rgba(190, 24, 93, 0.1)"
-                  : "0 4px 6px -1px rgba(0,0,0,0.02)",
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateX(4px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateX(0)";
-              }}
+              className={`flex items-center gap-4 p-5 rounded-xl border-l-4 transition-transform duration-300 hover:translate-x-1 ${
+                isCritical
+                  ? "border-pink-200 bg-pink-50 shadow-lg border-l-pink-600"
+                  : `border-slate-200 bg-white border-l-[${cfg.color}] shadow-sm`
+              }`}
             >
-              {/* Alert Icon */}
               <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 12,
-                  backgroundColor: isCritical ? "#fdf2f8" : cfg.bg,
-                  border: `1px solid ${isCritical ? "#fbcfe8" : "transparent"}`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
+                className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ${isCritical ? "bg-pink-50 border border-pink-200" : `bg-[${cfg.bg}] border-transparent`}`}
               >
                 <Icon size={24} color={isCritical ? "#be185d" : cfg.color} />
               </div>
 
-              {/* Alert Content */}
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 16,
-                      color: "#1e293b",
-                      letterSpacing: "-0.01em",
-                    }}
-                  >
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-lg text-slate-900">
                     {alert.patient.name}
                   </span>
                   <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: "4px 10px",
-                      borderRadius: 6,
-                      backgroundColor: isCritical ? "#be185d" : cfg.bg,
-                      color: isCritical ? "#fff" : cfg.color,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                    }}
+                    className={`text-[10px] font-bold px-2 py-1 rounded ${isCritical ? "bg-pink-600 text-white" : `bg-[${cfg.bg}] text-[${cfg.color}]`} uppercase`}
                   >
                     {cfg.label}
                   </span>
-                  <span
-                    style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8" }}
-                  >
+                  <span className="text-xs font-semibold text-slate-400">
                     {alert.time}
                   </span>
                 </div>
-                <p
-                  style={{
-                    fontSize: 14,
-                    color: "#475569",
-                    margin: "6px 0 0",
-                    fontWeight: 500,
-                    lineHeight: 1.4,
-                  }}
-                >
+                <p className="mt-1 text-sm text-slate-600 font-medium leading-snug">
                   {alert.message}
                 </p>
               </div>
 
-              {/* Actions */}
-              <div style={{ display: "flex", gap: 12, flexShrink: 0 }}>
+              <div className="flex gap-3 flex-shrink-0">
                 <button
                   onClick={() => acknowledge(alert.id)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "10px 16px",
-                    borderRadius: 10,
-                    border: "1px solid #e2e8f0",
-                    backgroundColor: "#fff",
-                    cursor: "pointer",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#475569",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f8fafc";
-                    e.currentTarget.style.borderColor = "#cbd5e1";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "#fff";
-                    e.currentTarget.style.borderColor = "#e2e8f0";
-                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-sm font-semibold shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
                 >
                   <Check size={16} /> Ack
                 </button>
                 <button
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "10px 18px",
-                    borderRadius: 10,
-                    border: "none",
-                    background: isCritical
-                      ? "linear-gradient(135deg, #be185d 0%, #db2777 100%)"
-                      : "#3b82f6",
-                    cursor: "pointer",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#fff",
-                    boxShadow: isCritical
-                      ? "0 4px 12px rgba(190, 24, 93, 0.25)"
-                      : "0 4px 12px rgba(59, 130, 246, 0.25)",
-                    transition: "transform 0.15s, box-shadow 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow = isCritical
-                      ? "0 6px 16px rgba(190, 24, 93, 0.35)"
-                      : "0 6px 16px rgba(59, 130, 246, 0.35)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = isCritical
-                      ? "0 4px 12px rgba(190, 24, 93, 0.25)"
-                      : "0 4px 12px rgba(59, 130, 246, 0.25)";
-                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-semibold shadow-sm transition transform hover:-translate-y-0.5 ${
+                    isCritical
+                      ? "bg-gradient-to-br from-pink-600 to-pink-500 shadow-pink-400/50 hover:shadow-pink-500/50"
+                      : "bg-blue-500 shadow-blue-400/50 hover:shadow-blue-500/50"
+                  }`}
                 >
                   <Phone size={16} /> Urgent Call
                 </button>
@@ -379,84 +226,31 @@ export default function AlertsView() {
         })}
       </div>
 
-      {/* Acknowledged/Resolved Alerts Section */}
       {resolved.length > 0 && (
-        <div style={{ marginTop: 40 }}>
-          <h3
-            style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: "#94a3b8",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              margin: "0 0 16px",
-            }}
-          >
+        <div className="mt-10">
+          <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-wide">
             Acknowledged Flags
           </h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="flex flex-col gap-3">
             {resolved.map((alert) => {
               const Icon = iconMap[alert.icon];
               return (
                 <div
                   key={alert.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 16,
-                    padding: "16px 24px",
-                    borderRadius: 12,
-                    backgroundColor: "#f8fafc",
-                    border: "1px solid #f1f5f9",
-                    opacity: 0.7,
-                    transition: "opacity 0.2s",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-                  onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
+                  className="flex items-center gap-4 p-4 rounded-lg bg-slate-50 border border-slate-200 opacity-70 hover:opacity-100 transition"
                 >
-                  <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 8,
-                      backgroundColor: "#f1f5f9",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Icon size={18} color="#94a3b8" />
+                  <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg bg-slate-100">
+                    <Icon size={18} className="text-slate-400" />
                   </div>
-                  <div
-                    style={{ flex: 1, display: "flex", alignItems: "center" }}
-                  >
-                    <span
-                      style={{
-                        fontWeight: 600,
-                        fontSize: 14,
-                        color: "#64748b",
-                        width: 140,
-                      }}
-                    >
+                  <div className="flex-1 flex items-center gap-2">
+                    <span className="font-semibold text-sm text-slate-500 w-36">
                       {alert.patient.name}
                     </span>
-                    <span
-                      style={{
-                        fontSize: 13,
-                        color: "#94a3b8",
-                        flex: 1,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
+                    <span className="text-xs text-slate-400 truncate">
                       {alert.message}
                     </span>
                   </div>
-                  <span
-                    style={{ fontSize: 12, fontWeight: 600, color: "#cbd5e1" }}
-                  >
+                  <span className="text-xs font-semibold text-slate-300">
                     {alert.time}
                   </span>
                 </div>

@@ -14,7 +14,6 @@ import { getStatus, getSmartAlert } from "../../api/client";
 import type { Patient } from "../../config/patients";
 import type { TriageLevel } from "../../types";
 
-// mock triage cases combining symptom + call data
 const triageCases = [
   {
     id: "c1",
@@ -71,29 +70,21 @@ const stats = [
     label: "Active Cases",
     value: triageCases.length.toString(),
     icon: Activity,
-    color: "#be185d",
-    bg: "#fdf2f8",
   },
   {
     label: "Critical / ER",
     value: triageCases.filter((c) => c.level === "emergency").length.toString(),
     icon: AlertTriangle,
-    color: "#e11d48",
-    bg: "#fef2f2",
   },
   {
     label: "Same-Day Risk",
     value: triageCases.filter((c) => c.level === "same_day").length.toString(),
     icon: Clock,
-    color: "#f59e0b",
-    bg: "#fffbeb",
   },
   {
     label: "Total Patients",
     value: patients.length.toString(),
     icon: Users,
-    color: "#3b82f6",
-    bg: "#eff6ff",
   },
 ];
 
@@ -111,10 +102,7 @@ export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
     let cancelled = false;
     async function check() {
       try {
-        const [status, alert] = await Promise.all([
-          getStatus(),
-          getSmartAlert(),
-        ]);
+        const [alert] = await Promise.all([getStatus(), getSmartAlert()]);
         if (cancelled) return;
         setBackendStatus("online");
         setLiveAlert(alert?.data || null);
@@ -130,77 +118,40 @@ export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
     };
   }, []);
 
+  const backendStyles =
+    backendStatus === "online"
+      ? "bg-green-50 border-green-200 text-green-700"
+      : backendStatus === "offline"
+        ? "bg-red-50 border-red-200 text-red-800"
+        : "bg-slate-50 border-slate-200 text-slate-500";
+
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-        }}
-      >
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h2
-            style={{
-              fontSize: 22,
-              fontWeight: 700,
-              color: "#1e293b",
-              margin: 0,
-              letterSpacing: "-0.02em",
-            }}
-          >
+          <h2 className="text-[22px] font-bold text-slate-800 tracking-[-0.02em] m-0">
             Welcome Dr. See
           </h2>
-          <p
-            style={{
-              fontSize: 14,
-              color: "#64748b",
-              margin: "4px 0 0",
-              fontWeight: 500,
-            }}
-          >
+          <p className="text-sm text-slate-500 mt-1 font-medium">
             Vitality has flagged{" "}
             {triageCases.filter((c) => c.level === "emergency").length} critical
             cases requiring your attention.
           </p>
         </div>
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 14px",
-            borderRadius: 10,
-            backgroundColor:
-              backendStatus === "online"
-                ? "#f0fdf4"
-                : backendStatus === "offline"
-                  ? "#fef2f2"
-                  : "#f8fafc",
-            border: `1px solid ${backendStatus === "online" ? "#bbf7d0" : backendStatus === "offline" ? "#fecaca" : "#e2e8f0"}`,
-          }}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg border ${backendStyles}`}
         >
           {backendStatus === "online" ? (
-            <Wifi size={14} color="#10b981" />
+            <Wifi size={14} className="text-emerald-500" />
           ) : (
             <WifiOff
               size={14}
-              color={backendStatus === "offline" ? "#ef4444" : "#94a3b8"}
+              className={
+                backendStatus === "offline" ? "text-red-500" : "text-slate-400"
+              }
             />
           )}
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color:
-                backendStatus === "online"
-                  ? "#15803d"
-                  : backendStatus === "offline"
-                    ? "#991b1b"
-                    : "#64748b",
-            }}
-          >
+          <span className="text-xs font-semibold">
             {backendStatus === "online"
               ? "Backend Live"
               : backendStatus === "offline"
@@ -212,113 +163,50 @@ export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
 
       {liveAlert && (
         <div
-          style={{
-            padding: "14px 20px",
-            borderRadius: 12,
-            marginBottom: 20,
-            backgroundColor:
-              liveAlert.severity === "critical" ? "#fef2f2" : "#fffbeb",
-            border: `1px solid ${liveAlert.severity === "critical" ? "#fecaca" : "#fde68a"}`,
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-          }}
+          className={`flex items-center gap-3 px-5 py-3.5 rounded-xl mb-5 border ${
+            liveAlert.severity === "critical"
+              ? "bg-red-50 border-red-200"
+              : "bg-amber-50 border-amber-200"
+          }`}
         >
           <AlertTriangle
             size={18}
-            color={liveAlert.severity === "critical" ? "#dc2626" : "#f59e0b"}
+            className={
+              liveAlert.severity === "critical"
+                ? "text-red-600"
+                : "text-amber-500"
+            }
           />
-          <div style={{ flex: 1 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
+          <div className="flex-1">
+            <span className="text-[13px] font-semibold text-slate-800">
               {liveAlert.title || "AI Alert"}
             </span>
-            <span style={{ fontSize: 12, color: "#64748b", marginLeft: 10 }}>
+            <span className="text-xs text-slate-500 ml-2.5">
               {liveAlert.message || liveAlert.summary || ""}
             </span>
           </div>
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              padding: "3px 8px",
-              borderRadius: 4,
-              backgroundColor: "#be185d",
-              color: "#fff",
-              textTransform: "uppercase",
-            }}
-          >
+          <span className="text-[10px] font-bold px-2 py-1 rounded bg-pink-700 text-white uppercase">
             live
           </span>
         </div>
       )}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 20,
-          marginBottom: 32,
-        }}
-      >
+      <div className="grid grid-cols-4 gap-5 mb-8">
         {stats.map((s) => {
           const Icon = s.icon;
           return (
             <div
               key={s.label}
-              style={{
-                backgroundColor: "#fff",
-                borderRadius: 16,
-                border: "1px solid #f1f5f9",
-                padding: "20px",
-                display: "flex",
-                alignItems: "center",
-                gap: 16,
-                boxShadow:
-                  "0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02)",
-                transition: "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                cursor: "default",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
+              className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center gap-4 shadow-sm transition-transform duration-200 hover:-translate-y-0.5"
             >
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 12,
-                  backgroundColor: s.bg,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: `inset 0 2px 4px rgba(255,255,255,0.8), 0 4px 8px ${s.color}15`,
-                }}
-              >
-                <Icon size={24} color={s.color} />
+              <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center shadow-inner">
+                <Icon size={24} className="text-pink-700" />
               </div>
               <div>
-                <p
-                  style={{
-                    fontSize: 13,
-                    color: "#64748b",
-                    margin: 0,
-                    fontWeight: 600,
-                  }}
-                >
+                <p className="text-[13px] text-slate-500 font-semibold m-0">
                   {s.label}
                 </p>
-                <p
-                  style={{
-                    fontSize: 26,
-                    fontWeight: 800,
-                    color: "#1e293b",
-                    margin: "2px 0 0",
-                    letterSpacing: "-0.03em",
-                  }}
-                >
+                <p className="text-[26px] font-extrabold text-slate-800 mt-0.5 tracking-[-0.03em]">
                   {s.value}
                 </p>
               </div>
@@ -327,50 +215,17 @@ export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
         })}
       </div>
 
-      <div
-        style={{
-          backgroundColor: "#fff",
-          borderRadius: 16,
-          border: "1px solid #f1f5f9",
-          padding: "24px",
-          boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            marginBottom: 20,
-          }}
-        >
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: "linear-gradient(135deg, #be185d 0%, #db2777 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Sparkles size={18} color="#fff" />
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+        <div className="flex items-center gap-2.5 mb-5">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-700 to-pink-600 flex items-center justify-center">
+            <Sparkles size={18} className="text-white" />
           </div>
-          <h3
-            style={{
-              fontSize: 16,
-              fontWeight: 700,
-              color: "#1e293b",
-              margin: 0,
-              letterSpacing: "-0.01em",
-            }}
-          >
+          <h3 className="text-base font-bold text-slate-800 tracking-[-0.01em] m-0">
             Vitality Triage Queue
           </h3>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="flex flex-col gap-3">
           {triageCases.map((c) => {
             const cfg = triageLevelConfig[c.level];
             const isCritical = c.level === "emergency";
@@ -379,52 +234,21 @@ export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
               <button
                 key={c.id}
                 onClick={() => onSelectPatient(c.patient)}
+                className={`flex items-center gap-4 px-5 py-4 rounded-xl text-left transition-all duration-200 border ${
+                  isCritical
+                    ? "border-pink-200 bg-pink-50/40 shadow-sm"
+                    : "border-slate-100 bg-white"
+                } hover:translate-x-1`}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 16,
-                  padding: "16px 20px",
-                  borderRadius: 12,
-                  border: isCritical
-                    ? "1px solid #fbcfe8"
-                    : "1px solid #f1f5f9",
-                  backgroundColor: isCritical ? "#fffbfe" : "#fff",
                   borderLeft: `4px solid ${isCritical ? "#be185d" : cfg.color}`,
-                  cursor: "pointer",
-                  textAlign: "left",
-                  transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                  boxShadow: isCritical
-                    ? "0 4px 12px rgba(190, 24, 93, 0.05)"
-                    : "none",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateX(4px)";
-                  e.currentTarget.style.borderColor = isCritical
-                    ? "#f9a8d4"
-                    : "#e2e8f0";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateX(0)";
-                  e.currentTarget.style.borderColor = isCritical
-                    ? "#fbcfe8"
-                    : "#f1f5f9";
                 }}
               >
                 <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    backgroundColor: isCritical ? "#fdf2f8" : "#f8fafc",
-                    border: `2px solid ${isCritical ? "#fbcfe8" : "#e2e8f0"}`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 700,
-                    fontSize: 15,
-                    color: isCritical ? "#be185d" : "#475569",
-                    flexShrink: 0,
-                  }}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-[15px] shrink-0 ${
+                    isCritical
+                      ? "bg-pink-50 border-2 border-pink-200 text-pink-700"
+                      : "bg-slate-50 border-2 border-slate-200 text-slate-600"
+                  }`}
                 >
                   {c.patient.name
                     .split(" ")
@@ -432,68 +256,36 @@ export default function DashboardHome({ onSelectPatient }: DashboardHomeProps) {
                     .join("")}
                 </div>
 
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 10 }}
-                  >
-                    <span
-                      style={{
-                        fontWeight: 700,
-                        fontSize: 15,
-                        color: "#1e293b",
-                      }}
-                    >
+                <div className="flex-1">
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-bold text-[15px] text-slate-800">
                       {c.patient.name}
                     </span>
                     <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        padding: "4px 10px",
-                        borderRadius: 6,
-                        backgroundColor: isCritical ? "#be185d" : cfg.bg,
-                        color: isCritical ? "#fff" : cfg.color,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider ${
+                        isCritical ? "bg-pink-700 text-white" : ""
+                      }`}
+                      style={
+                        !isCritical
+                          ? {
+                              backgroundColor: cfg.bg,
+                              color: cfg.color,
+                            }
+                          : undefined
+                      }
                     >
                       {cfg.label}
                     </span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 600,
-                        padding: "4px 8px",
-                        borderRadius: 4,
-                        backgroundColor: "#f1f5f9",
-                        color: "#64748b",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.02em",
-                      }}
-                    >
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded bg-slate-100 text-slate-500 uppercase tracking-wide">
                       {c.source}
                     </span>
                   </div>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      color: "#475569",
-                      margin: "6px 0 0",
-                      fontWeight: 500,
-                    }}
-                  >
+                  <p className="text-[13px] text-slate-600 mt-1.5 font-medium">
                     {c.summary}
                   </p>
                 </div>
 
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "#94a3b8",
-                    flexShrink: 0,
-                  }}
-                >
+                <span className="text-xs font-semibold text-slate-400 shrink-0">
                   {c.time}
                 </span>
               </button>
